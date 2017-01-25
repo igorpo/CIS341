@@ -1,0 +1,42 @@
+### Starting build.
+# Target: main.ml.depends, tags: { extension:ml, file:main.ml, ocaml, ocamldep, quiet }
+ocamldep.opt -modules main.ml > main.ml.depends # cached
+# Target: util/assert.mli.depends, tags: { extension:mli, file:util/assert.mli, ocaml, ocamldep, quiet }
+ocamldep.opt -modules util/assert.mli > util/assert.mli.depends
+# Target: gradedtests.ml.depends, tags: { extension:ml, file:gradedtests.ml, ocaml, ocamldep, quiet }
+ocamldep.opt -modules gradedtests.ml > gradedtests.ml.depends # cached
+# Target: util/assert.cmi, tags: { byte, compile, extension:mli, file:util/assert.mli, interf, ocaml, quiet }
+ocamlc.opt -c -I util -I x86 -o util/assert.cmi util/assert.mli
+# Target: simulator.ml.depends, tags: { extension:ml, file:simulator.ml, ocaml, ocamldep, quiet }
+ocamldep.opt -modules simulator.ml > simulator.ml.depends # cached
+# Target: x86/x86.ml.depends, tags: { extension:ml, file:x86/x86.ml, ocaml, ocamldep, quiet }
+ocamldep.opt -modules x86/x86.ml > x86/x86.ml.depends
+# Target: x86/x86.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:x86/x86.cmo, file:x86/x86.ml, implem, ocaml, quiet }
+ocamlc.opt -c -I x86 -I util -o x86/x86.cmo x86/x86.ml
+# Target: simulator.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:simulator.cmo, file:simulator.ml, implem, ocaml, quiet }
+ocamlc.opt -c -I x86 -I util -o simulator.cmo simulator.ml
+# Target: providedtests.ml.depends, tags: { extension:ml, file:providedtests.ml, ocaml, ocamldep, quiet }
+ocamldep.opt -modules providedtests.ml > providedtests.ml.depends
+# Target: gradedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:gradedtests.cmo, file:gradedtests.ml, implem, ocaml, quiet }
+ocamlc.opt -c -I x86 -I util -o gradedtests.cmo gradedtests.ml
+# Target: providedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:providedtests.cmo, file:providedtests.ml, implem, ocaml, quiet }
+ocamlc.opt -c -I x86 -I util -o providedtests.cmo providedtests.ml
+# Target: main.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:main.cmo, file:main.ml, implem, ocaml, quiet }
+ocamlc.opt -c -I x86 -I util -o main.cmo main.ml
+# Target: util/assert.ml.depends, tags: { extension:ml, file:util/assert.ml, ocaml, ocamldep, quiet }
+ocamldep.opt -modules util/assert.ml > util/assert.ml.depends
+# Target: util/assert.cmx, tags: { compile, extension:cmx, extension:ml, file:util/assert.cmx, file:util/assert.ml, implem, native, ocaml, quiet }
+ocamlopt.opt -c -I util -I x86 -o util/assert.cmx util/assert.ml
+# Target: x86/x86.cmx, tags: { compile, extension:cmx, extension:ml, file:x86/x86.cmx, file:x86/x86.ml, implem, native, ocaml, quiet }
+ocamlopt.opt -c -I x86 -I util -o x86/x86.cmx x86/x86.ml
+# Target: simulator.cmx, tags: { compile, extension:cmx, extension:ml, file:simulator.cmx, file:simulator.ml, implem, native, ocaml, quiet }
+ocamlopt.opt -c -I x86 -I util -o simulator.cmx simulator.ml
+# Target: gradedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:gradedtests.cmx, file:gradedtests.ml, implem, native, ocaml, quiet }
+ocamlopt.opt -c -I x86 -I util -o gradedtests.cmx gradedtests.ml
+# Target: providedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:providedtests.cmx, file:providedtests.ml, implem, native, ocaml, quiet }
+ocamlopt.opt -c -I x86 -I util -o providedtests.cmx providedtests.ml
+# Target: main.cmx, tags: { compile, extension:cmx, extension:ml, file:main.cmx, file:main.ml, implem, native, ocaml, quiet }
+ocamlopt.opt -c -I x86 -I util -o main.cmx main.ml
+# Target: main.native, tags: { dont_link_with, extension:native, file:main.native, link, native, ocaml, program, quiet }
+ocamlopt.opt nums.cmxa unix.cmxa str.cmxa x86/x86.cmx simulator.cmx util/assert.cmx gradedtests.cmx providedtests.cmx main.cmx -o main.native
+# Compilation successful.
