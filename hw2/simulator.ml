@@ -140,12 +140,75 @@ let interp_cnd {fo; fs; fz} : cnd -> bool = fun x ->
   end
 
 
-
 (* Maps an X86lite address into Some OCaml array index,
    or None if the address is not within the legal address space. *)
 let map_addr (addr:quad) : int option =
   let addr_check = addr >= mem_bot && addr < mem_top in
-  if addr_check then Some (Int64.to_int (Int64.sub addr mem_bot)) else None 
+    if addr_check then
+      Some (Int64.to_int (Int64.sub addr mem_bot))
+    else
+      None 
+
+
+(* Interprets operands *)
+let interp_operand (op:operand) : int64 =
+  begin match op with
+  | Imm i -> 
+    begin match i with
+    | Lit l -> l  
+    | Lbl l -> 0L
+    end
+  | Reg r -> 0L
+  | Ind1 i1 -> 0L
+  | Ind2 i2 -> 0L
+  | Ind3 i3 -> 0L
+  end
+
+(* Interprets instruction *)
+(*     
+    - perform instruction
+    - update the registers and/or memory appropriately
+    - set the condition flags 
+*)
+let exec_ins (inst:ins) (m:mach) : unit =
+  let opc, opl = inst in 
+  begin match opc with
+  | Movq -> ()
+  | Pushq -> ()
+  | Popq -> ()
+  | Leaq -> ()
+  | Incq -> ()
+  | Decq -> ()
+  | Negq -> ()
+  | Notq -> ()
+  | Addq -> ()
+  | Subq -> ()
+  | Imulq -> ()
+  | Xorq -> ()
+  | Orq -> ()
+  | Andq -> () 
+  | Shlq -> ()
+  | Sarq -> ()
+  | Shrq -> ()    
+  | Jmp -> ()
+  | J j -> ()
+  | Cmpq -> ()
+  | Set s -> ()
+  | Callq -> ()
+  | Retq -> ()
+  end
+
+
+(* Update flags *)
+let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
+  f.fo <- fo; f.fs <- fs; f.fz <- fz    
+
+(* Initializes machine state *)
+let init_state (m:mach) : unit =
+  update_flags m.flags false false false
+
+(* Resolves label *)
+(* let resolve_lbl (l:lbl) () *)
 
 (* Simulates one step of the machine:
     - fetch the instruction at %rip
@@ -154,8 +217,16 @@ let map_addr (addr:quad) : int option =
     - update the registers and/or memory appropriately
     - set the condition flags
 *)
+
 let step (m:mach) : unit =
-failwith "step unimplemented"
+  let rip = m.regs.(rind Rip) in
+  let inst = m.mem.(Int64.to_int rip) in
+  begin match inst with
+  | InsB0 i -> exec_ins i m
+  | _ -> () (* TODO: do we need to anything with byte?? *)
+  end
+
+
 
 (* Runs the machine until the rip register reaches a designated
    memory address. *)
@@ -192,8 +263,42 @@ exception Redefined_sym of lbl
 
   HINT: List.fold_left and List.fold_right are your friends.
  *)
+
+ (* 
+  We know that:
+    1. size of data = len(s) + 1
+    2. size of Lit = 8
+    3. size of ins = 4 
+  *)
+let data_size_helper (s:int64) (d:data) : int64 = 
+  begin match d with
+  | Asciz a -> 
+    let len = Int64.of_int (String.length a) in
+    Int64.add s (Int64.add 1L len)
+  | Quad q -> 
+    begin match q with
+    | Lit l -> Int64.add s 8L
+    | Lbl l -> 
+      let len = Int64.of_int (String.length l) in 
+      Int64.add len (Int64.add s 1L) 
+    end
+  end
+
+
+let compute_size (s:(int64 * int64)) (e:elem) : (int64 * int64) =
+  let size_t, size_d = s in
+  begin match e.asm with
+  | Text t -> 
+    let list_size = (Int64.of_int (List.length t)) in
+    (Int64.add size_t (Int64.mul list_size 4L), size_d)
+  | Data d -> (size_t, Int64.add size_d (List.fold_left data_size_helper 0L d))
+  end
+
 let assemble (p:prog) : exec =
-failwith "assemble unimplemented"
+  let size_text, size_data = List.fold_left compute_size (0L, 0L) p in
+  {entry=0L; text_pos=mem_bot; data_pos=Int64.add mem_bot size_text;
+   text_seg=[]; data_seg=[]}
+
 
 (* Convert an object file into an executable machine state. 
     - allocate the mem array
