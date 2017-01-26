@@ -250,19 +250,7 @@ exception Undefined_sym of lbl
 (* Assemble should raise this when a label is defined more than once *)
 exception Redefined_sym of lbl
 
-(* Convert an X86 program into an object file:
-   - separate the text and data segments
-   - compute the size of each segment
-      Note: the size of an Asciz string section is (1 + the string length)
 
-   - resolve the labels to concrete addresses and 'patch' the instructions to 
-     replace Lbl values with the corresponding Imm values.
-
-   - the text segment starts at the lowest address
-   - the data segment starts after the text segment
-
-  HINT: List.fold_left and List.fold_right are your friends.
- *)
 
  (* 
   We know that:
@@ -294,6 +282,19 @@ let compute_size (s:(int64 * int64)) (e:elem) : (int64 * int64) =
   | Data d -> (size_t, Int64.add size_d (List.fold_left data_size_helper 0L d))
   end
 
+(* Convert an X86 program into an object file:
+   - separate the text and data segments
+   - compute the size of each segment
+      Note: the size of an Asciz string section is (1 + the string length)
+
+   - resolve the labels to concrete addresses and 'patch' the instructions to 
+     replace Lbl values with the corresponding Imm values.
+
+   - the text segment starts at the lowest address
+   - the data segment starts after the text segment
+
+  HINT: List.fold_left and List.fold_right are your friends.
+ *)
 let assemble (p:prog) : exec =
   let size_text, size_data = List.fold_left compute_size (0L, 0L) p in
   {entry=0L; text_pos=mem_bot; data_pos=Int64.add mem_bot size_text;
