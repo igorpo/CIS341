@@ -144,24 +144,28 @@ let interp_cnd {fo; fs; fz} : cnd -> bool = fun x ->
    or None if the address is not within the legal address space. *)
 let map_addr (addr:quad) : int option =
   let addr_check = addr >= mem_bot && addr < mem_top in
-    if addr_check then
-      Some (Int64.to_int (Int64.sub addr mem_bot))
-    else
-      None 
+  if addr_check then
+    Some (Int64.to_int (Int64.sub addr mem_bot))
+  else
+    None 
 
 
 (* Interprets operands *)
-let interp_operand (op:operand) : int64 =
+let interp_operand (op:operand) (m:mach) : int64 =
   begin match op with
   | Imm i -> 
     begin match i with
     | Lit l -> l  
-    | Lbl l -> 0L
+    | Lbl _ -> invalid_arg "Attempted to interpret a label"
     end
-  | Reg r -> 0L
-  | Ind1 i1 -> 0L
-  | Ind2 i2 -> 0L
-  | Ind3 i3 -> 0L
+  | Reg r -> m.regs.(rind r)
+  | Ind1 i -> 
+    begin match i with
+    | Lit l -> 0L
+    | Lbl _ -> invalid_arg "Attempted to interpret a label"
+    end
+  | Ind2 i -> 0L
+  | Ind3 (i, r) -> 0L
   end
 
 (* Interprets instruction *)
