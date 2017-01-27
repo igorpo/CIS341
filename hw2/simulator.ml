@@ -149,23 +149,29 @@ let map_addr (addr:quad) : int option =
   else
     None 
 
+(* Resolve the correction of addresses used with indirects
+    or raise exception where necessary *)
+let resolve_addr (v:int64) (offset:int64) (m:mach)  : int64 = 
+  begin match map_addr v with 
+  | Some s -> int64_of_sbytes [m.mem.(s)]
+  | None -> raise X86lite_segfault
+  end
+
+(*  Convenience func for resolving lits and not labels *)
+let valid_lit (i:imm) : int64 =
+  begin match i with 
+  | Lit l -> l
+  | Lbl _ -> invalid_arg "Attempted to interpret a label"
+  end
 
 (* Interprets operands *)
 let interp_operand (op:operand) (m:mach) : int64 =
   begin match op with
-  | Imm i -> 
-    begin match i with
-    | Lit l -> l  
-    | Lbl _ -> invalid_arg "Attempted to interpret a label"
-    end
+  | Imm i -> valid_lit i
   | Reg r -> m.regs.(rind r)
-  | Ind1 i -> 
-    begin match i with
-    | Lit l -> 0L
-    | Lbl _ -> invalid_arg "Attempted to interpret a label"
-    end
-  | Ind2 i -> 0L
-  | Ind3 (i, r) -> 0L
+  | Ind1 i -> resolve_addr (valid_lit i) 0L m 
+  | Ind2 r -> resolve_addr m.regs.(rind r) 0L m
+  | Ind3 (i, r) -> resolve_addr m.regs.(rind r) (valid_lit i) m
   end
 
 (* Interprets instruction *)
