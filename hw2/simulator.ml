@@ -293,24 +293,19 @@ let compute_size (s:(int64 * int64)) (e:elem) : (int64 * int64) =
   end
 
 
+let rec map_contains (m:map) (k:lbl) : bool =
+  begin match m with
+  | (x, y)::tl -> 
+    if x = k then true else map_contains tl k
+  | [] -> false
+  end
+
 let rec map_lookup (m:map) (k:lbl) : quad =
   begin match m with
   | (x, y)::tl -> 
     if x = k then y else map_lookup tl k
   | [] -> raise (Undefined_sym k)
   end
-
-
-let handle_data (t:map * sbyte list) (e:elem) : (map * sbyte list) = 
-  let m, data_seg = t in
-  (* 
-    takes in symbol_map dictionary, sbyte list
-    match asm on data
-    update map, sbyte list
-    
-    return map, sbyte list
-  *)
-  (m, [])
 
 
 let resolve_lbl_helper (m:map) (i:imm) : quad =
@@ -339,7 +334,31 @@ let patch_ins (m:map * sbyte list) (i:ins) : (map * sbyte list) =
   (_map, sbyte_l @ sbytes_of_ins (op, patched_opr_l))
 
 
-let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
+
+
+let map_push : () =
+  ()
+
+
+
+(* 
+  takes in symbol_map dictionary, sbyte list
+  match asm on data
+  update map, sbyte list
+  
+  return map, sbyte list
+*)
+let handle_data (t:map * sbyte list) (e:elem) : (map * sbyte list) = 
+  let _map, text_seg = m in
+  let label = e.lbl in
+  let _asm = e.asm in 
+  begin match _asm with
+  | Data d -> 
+  | _ -> m
+  end
+
+
+
 (* 
     takes in symbol_map dictionary, sbyte list
     match asm on text
@@ -348,6 +367,7 @@ let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
 
     return sbyte list
   *)  
+let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
   let _map, text_seg = m in
   (* let label = e.lbl in *)
   let _asm = e.asm in 
@@ -359,6 +379,7 @@ let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
   end
 
 
+
 (* first generates map and data segment *)
 (* then folds on the program to generate text segment *)
 (* return text_seg, data_seg *)
@@ -368,6 +389,9 @@ let resolve_symbols (p:prog) : (sbyte list * sbyte list) =
   (text_seg, data_seg)
   
 
+(* Finds main label *)
+let rec find_main (t:sbyte list) : quad =
+  0L
 
 (* Convert an X86 program into an object file:
    - separate the text and data segments
@@ -385,7 +409,7 @@ let resolve_symbols (p:prog) : (sbyte list * sbyte list) =
 let assemble (p:prog) : exec =
   let size_text, size_data = List.fold_left compute_size (0L, 0L) p in
   let text_seg, data_seg = resolve_symbols p in
-    {entry=0L; text_pos=mem_bot; data_pos=Int64.add mem_bot size_text;
+    {entry=(find_main text_seg); text_pos=mem_bot; data_pos=Int64.add mem_bot size_text;
     text_seg=text_seg; data_seg=data_seg}
 
 
