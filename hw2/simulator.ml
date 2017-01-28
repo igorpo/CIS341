@@ -6,6 +6,7 @@
 *)
 
 open X86
+open Hashtbl
 
 (* simulator machine state -------------------------------------------------- *)
 
@@ -69,6 +70,9 @@ type mach = { flags : flags
             ; regs : regs
             ; mem : mem
             }
+
+
+type map = (lbl * quad) list
 
 (* simulator helper functions ----------------------------------------------- *)
 
@@ -181,8 +185,8 @@ let interp_operand (op:operand) (m:mach) : int64 =
     - set the condition flags 
 *)
 let exec_ins (inst:ins) (m:mach) : unit =
-  let opc, opl = inst in 
-  begin match opc with
+  let op_code, oprnd_lst = inst in 
+  begin match op_code with
   | Movq -> ()
   | Pushq -> ()
   | Popq -> ()
@@ -217,8 +221,6 @@ let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
 let init_state (m:mach) : unit =
   update_flags m.flags false false false
 
-(* Resolves label *)
-(* let resolve_lbl (l:lbl) () *)
 
 (* Simulates one step of the machine:
     - fetch the instruction at %rip
@@ -235,7 +237,6 @@ let step (m:mach) : unit =
   | InsB0 i -> exec_ins i m
   | _ -> () (* TODO: do we need to anything with byte?? *)
   end
-
 
 
 (* Runs the machine until the rip register reaches a designated
@@ -259,7 +260,6 @@ exception Undefined_sym of lbl
 
 (* Assemble should raise this when a label is defined more than once *)
 exception Redefined_sym of lbl
-
 
 
  (* 
@@ -292,6 +292,83 @@ let compute_size (s:(int64 * int64)) (e:elem) : (int64 * int64) =
   | Data d -> (size_t, Int64.add size_d (List.fold_left data_size_helper 0L d))
   end
 
+
+let rec map_lookup (m:map) (k:lbl) : quad =
+  begin match m with
+  | (x, y)::tl -> 
+    if x = k then y else map_lookup tl k
+  | [] -> raise (Undefined_sym k)
+  end
+
+
+let handle_data (t:map * sbyte list) (e:elem) : (map * sbyte list) = 
+  let m, data_seg = t in
+  (* 
+    takes in symbol_map dictionary, sbyte list
+    match asm on data
+    update map, sbyte list
+    
+    return map, sbyte list
+  *)
+  (m, [])
+
+
+let resolve_lbl_helper (m:map) (i:imm) : quad =
+  begin match i with
+  | Lit l -> l
+  | Lbl l -> map_lookup m l
+  end
+
+let resolve_lbl (m:map * operand list) (o:operand) : (map * operand list) = 
+  let _map, oper_l = m in
+  begin match o with
+  | Ind1 x -> (_map, oper_l @ [Ind1 (Lit (resolve_lbl_helper _map x))])
+  | Ind3 (x,r) -> (_map, oper_l @ [Ind3 (Lit (resolve_lbl_helper _map x), r)])
+  | Imm x -> (_map, oper_l @ [Imm (Lit (resolve_lbl_helper _map x))])
+  | _ -> m
+  end
+  
+
+let patch_ins (m:map * sbyte list) (i:ins) : (map * sbyte list) =
+  (* _map = same symbol table; sbyte_l = accumlated sbyte list*)
+  let _map, sbyte_l = m in 
+  (* i = instruction in question *)
+  (* op = the opcode, opr_l = yet to be patched operand list *)
+  let op, opr_l = i in
+  let _, patched_opr_l = List.fold_left resolve_lbl (_map, []) opr_l in
+  (_map, sbyte_l @ sbytes_of_ins (op, patched_opr_l))
+
+
+let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
+(* 
+    takes in symbol_map dictionary, sbyte list
+    match asm on text
+    replace lbls according to map, update sbyte list
+    if lbl not in map, exception
+
+    return sbyte list
+  *)  
+  let _map, text_seg = m in
+  (* let label = e.lbl in *)
+  let _asm = e.asm in 
+  begin match _asm with
+  (* fold on map, t with patch_ins*)
+  | Text t -> let _, patched_ins = List.fold_left patch_ins (_map, []) t in
+    (_map, patched_ins)
+  | _ -> m
+  end
+
+
+(* first generates map and data segment *)
+(* then folds on the program to generate text segment *)
+(* return text_seg, data_seg *)
+let resolve_symbols (p:prog) : (sbyte list * sbyte list) =
+  let _map, data_seg = List.fold_left handle_data ([], []) p in
+  let _, text_seg = List.fold_left handle_text (_map, []) p in
+  (text_seg, data_seg)
+  
+
+
 (* Convert an X86 program into an object file:
    - separate the text and data segments
    - compute the size of each segment
@@ -307,8 +384,9 @@ let compute_size (s:(int64 * int64)) (e:elem) : (int64 * int64) =
  *)
 let assemble (p:prog) : exec =
   let size_text, size_data = List.fold_left compute_size (0L, 0L) p in
-  {entry=0L; text_pos=mem_bot; data_pos=Int64.add mem_bot size_text;
-   text_seg=[]; data_seg=[]}
+  let text_seg, data_seg = resolve_symbols p in
+    {entry=0L; text_pos=mem_bot; data_pos=Int64.add mem_bot size_text;
+    text_seg=text_seg; data_seg=data_seg}
 
 
 (* Convert an object file into an executable machine state. 
