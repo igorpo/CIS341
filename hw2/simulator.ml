@@ -455,9 +455,12 @@ let load {entry; text_pos; data_pos; text_seg; data_seg} : mach =
   let program = Array.of_list (text_seg @ data_seg) in
   let p_len = Array.length program in 
   let reg_arr = Array.make nregs 0L in 
+  let exit_address = Array.of_list (sbytes_of_int64 exit_addr) in
+  let e_l = Array.length exit_address in 
   Array.blit program 0 mem_arr 0 p_len;
+  Array.blit exit_address 0 mem_arr (mem_size - 8) e_l;
   reg_arr.(rind Rip) <- entry;
-  reg_arr.(rind Rsp) <- Int64.sub mem_top 8L; (*or is this just mem_top?*)
+  reg_arr.(rind Rsp) <- Int64.sub mem_top 8L; 
   {mem=mem_arr; regs=reg_arr; flags={fo=false;fs=false;fz=false;}}
 
 
