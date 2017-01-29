@@ -451,4 +451,18 @@ let assemble (p:prog) : exec =
   may be of use.
 *)
 let load {entry; text_pos; data_pos; text_seg; data_seg} : mach = 
-failwith "load unimplemented"
+  let mem_arr = Array.make mem_size (Byte '\x00') in
+  let program = Array.of_list (text_seg @ data_seg) in
+  let p_len = Array.length program in 
+  let reg_arr = Array.make nregs 0L in 
+  Array.blit program 0 mem_arr 0 p_len;
+  reg_arr.(rind Rip) <- entry;
+  reg_arr.(rind Rsp) <- Int64.sub mem_top 8L; (*or is this just mem_top?*)
+  {mem=mem_arr; regs=reg_arr; flags={fo=false;fs=false;fz=false;}}
+
+
+
+
+
+
+
