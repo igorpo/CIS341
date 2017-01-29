@@ -349,8 +349,8 @@ let resolve_lbl (m:map * operand list) (o:operand) : (map * operand list) =
   | Ind1 x -> (_map, oper_l @ [Ind1 (Lit (resolve_lbl_helper _map x))])
   | Ind3 (x,r) -> (_map, oper_l @ [Ind3 (Lit (resolve_lbl_helper _map x), r)])
   | Imm x -> (_map, oper_l @ [Imm (Lit (resolve_lbl_helper _map x))])
-  (* | Asm a ->  *)
-  | _ -> m
+  | Reg r -> (_map, oper_l @ [Reg r])
+  | Ind2 i -> (_map, oper_l @ [Ind2 i])
   end
 
 let patch_ins (m:map * sbyte list) (i:ins) : (map * sbyte list) =
@@ -358,6 +358,7 @@ let patch_ins (m:map * sbyte list) (i:ins) : (map * sbyte list) =
   let _map, sbyte_l = m in 
   (* i = instruction in question *)
   (* op = the opcode, opr_l = yet to be patched operand list *)
+  Printf.printf "INSTRUCTION: %s\n" (string_of_ins i);
   let op, opr_l = i in
   let _, patched_opr_l = List.fold_left resolve_lbl (_map, []) opr_l in
   (_map, sbyte_l @ sbytes_of_ins (op, patched_opr_l))
