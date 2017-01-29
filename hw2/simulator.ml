@@ -6,7 +6,6 @@
 *)
 
 open X86
-open Hashtbl
 
 (* simulator machine state -------------------------------------------------- *)
 
@@ -130,7 +129,7 @@ let sbytes_of_data : data -> sbyte list = function
 
 (* It might be useful to toggle printing of intermediate states of your 
    simulator. *)
-let debug_simulator = ref false
+let debug_simulator = ref true
 
 (* Interpret a condition code with respect to the given flags. *)
 let interp_cnd {fo; fs; fz} : cnd -> bool = fun x -> 
@@ -308,10 +307,40 @@ let rec map_lookup (m:map) (k:lbl) : quad =
   end
 
 
+let data_helper (l:sbyte list) (d:data): sbyte list =
+  l @ (sbytes_of_data d)
+
+(* 
+  takes in symbol_map dictionary, sbyte list
+  match asm on data
+  update map, sbyte list
+  
+  return map, sbyte list
+*)
+let handle_data (t:int64 * map * sbyte list) 
+                (e:elem) : (int64 * map * sbyte list) = 
+  begin match e.asm with
+    | Data d -> 
+      let size_text, _map, data_seg = t in
+      let label = e.lbl in (* lbl to be resolved *)
+      let new_map = 
+        if not (map_contains _map label) then 
+        (* update map *)
+          let list_size = Int64.of_int (List.length data_seg) in
+          _map @ [(label, (Int64.add size_text list_size))]
+        else
+          raise (Redefined_sym label) in
+      let new_data_seg = List.fold_left data_helper data_seg d in
+      (size_text, new_map, new_data_seg)
+    | _ -> t
+  end
+
+  
+
 let resolve_lbl_helper (m:map) (i:imm) : quad =
   begin match i with
-  | Lit l -> l
-  | Lbl l -> map_lookup m l
+  | Lit l -> l 
+  | Lbl l -> Int64.add mem_bot (map_lookup m l)
   end
 
 let resolve_lbl (m:map * operand list) (o:operand) : (map * operand list) = 
@@ -320,9 +349,9 @@ let resolve_lbl (m:map * operand list) (o:operand) : (map * operand list) =
   | Ind1 x -> (_map, oper_l @ [Ind1 (Lit (resolve_lbl_helper _map x))])
   | Ind3 (x,r) -> (_map, oper_l @ [Ind3 (Lit (resolve_lbl_helper _map x), r)])
   | Imm x -> (_map, oper_l @ [Imm (Lit (resolve_lbl_helper _map x))])
+  (* | Asm a ->  *)
   | _ -> m
   end
-  
 
 let patch_ins (m:map * sbyte list) (i:ins) : (map * sbyte list) =
   (* _map = same symbol table; sbyte_l = accumlated sbyte list*)
@@ -332,31 +361,6 @@ let patch_ins (m:map * sbyte list) (i:ins) : (map * sbyte list) =
   let op, opr_l = i in
   let _, patched_opr_l = List.fold_left resolve_lbl (_map, []) opr_l in
   (_map, sbyte_l @ sbytes_of_ins (op, patched_opr_l))
-
-
-
-
-let map_push : () =
-  ()
-
-
-
-(* 
-  takes in symbol_map dictionary, sbyte list
-  match asm on data
-  update map, sbyte list
-  
-  return map, sbyte list
-*)
-let handle_data (t:map * sbyte list) (e:elem) : (map * sbyte list) = 
-  let _map, text_seg = m in
-  let label = e.lbl in
-  let _asm = e.asm in 
-  begin match _asm with
-  | Data d -> 
-  | _ -> m
-  end
-
 
 
 (* 
@@ -369,12 +373,18 @@ let handle_data (t:map * sbyte list) (e:elem) : (map * sbyte list) =
   *)  
 let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
   let _map, text_seg = m in
-  (* let label = e.lbl in *)
-  let _asm = e.asm in 
-  begin match _asm with
+  begin match e.asm with
   (* fold on map, t with patch_ins*)
-  | Text t -> let _, patched_ins = List.fold_left patch_ins (_map, []) t in
-    (_map, patched_ins)
+  | Text t -> 
+    let label = e.lbl in (* labels such as main, foo*)
+    let new_map = 
+      if not (map_contains _map label) then 
+        let list_size = Int64.of_int (List.length text_seg) in
+        _map @ [(label, (Int64.mul 4L list_size))]
+      else
+        raise (Redefined_sym label) in
+    let _, patched_ins = List.fold_left patch_ins (new_map, text_seg) t in
+    (new_map, patched_ins)
   | _ -> m
   end
 
@@ -383,15 +393,25 @@ let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
 (* first generates map and data segment *)
 (* then folds on the program to generate text segment *)
 (* return text_seg, data_seg *)
-let resolve_symbols (p:prog) : (sbyte list * sbyte list) =
-  let _map, data_seg = List.fold_left handle_data ([], []) p in
-  let _, text_seg = List.fold_left handle_text (_map, []) p in
-  (text_seg, data_seg)
+let resolve_symbols (p:prog) (s:int64) : (quad * sbyte list * sbyte list) =
+  let size_text = s in
+  let _, _map, data_seg = List.fold_left handle_data (size_text, [], []) p in
+  let new_map, text_seg = List.fold_left handle_text (_map, []) p in
+  ((resolve_lbl_helper new_map (Lbl "main")), text_seg, data_seg)
+
+
+let rec accum_sbyte (l:sbyte list) : string =
+  begin match l with
+  | h::tl -> 
+    begin match h with 
+    | InsB0 i -> (string_of_ins i) ^ "; " ^ (accum_sbyte tl)
+    | InsFrag -> "InsFrag; " ^ (accum_sbyte tl)
+    | Byte b -> (String.make 1 b) ^ "; " ^ (accum_sbyte tl)
+    end
+  | [] -> ""
+  end
   
 
-(* Finds main label *)
-let rec find_main (t:sbyte list) : quad =
-  0L
 
 (* Convert an X86 program into an object file:
    - separate the text and data segments
@@ -408,8 +428,11 @@ let rec find_main (t:sbyte list) : quad =
  *)
 let assemble (p:prog) : exec =
   let size_text, size_data = List.fold_left compute_size (0L, 0L) p in
-  let text_seg, data_seg = resolve_symbols p in
-    {entry=(find_main text_seg); text_pos=mem_bot; data_pos=Int64.add mem_bot size_text;
+  let main, text_seg, data_seg = resolve_symbols p size_text in
+    Printf.printf "%s\n\n\n\n" (string_of_prog p);
+    Printf.printf "%s\n\n\n\n" (accum_sbyte text_seg);
+    {entry=main; text_pos=mem_bot; 
+    data_pos=Int64.add mem_bot size_text;
     text_seg=text_seg; data_seg=data_seg}
 
 
