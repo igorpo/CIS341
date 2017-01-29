@@ -177,6 +177,26 @@ let interp_operand (op:operand) (m:mach) : int64 =
   | Ind3 (i, r) -> resolve_addr m.regs.(rind r) (valid_lit i) m
   end
 
+
+let src_dest (m:mach) (o:operand list) (f:function) : unit =
+  begin match o with
+  | s::d::[] -> 
+    let SRC = interp_operand s m in
+    let DEST = interp_operand d m in
+    let result = f SRC DEST in
+    let value = result.value in
+    let of = result.overflow in
+
+
+  | _ -> failwith "Cannot have more than two operands in this list"
+  end
+  
+
+  
+  
+
+
+let update_state 
 (* Interprets instruction *)
 (*     
     - perform instruction
@@ -186,30 +206,31 @@ let interp_operand (op:operand) (m:mach) : int64 =
 let exec_ins (inst:ins) (m:mach) : unit =
   let op_code, oprnd_lst = inst in 
   begin match op_code with
-  | Movq -> ()
-  | Pushq -> ()
-  | Popq -> ()
-  | Leaq -> ()
-  | Incq -> ()
-  | Decq -> ()
-  | Negq -> ()
-  | Notq -> ()
-  | Addq -> ()
-  | Subq -> ()
-  | Imulq -> ()
-  | Xorq -> ()
-  | Orq -> ()
-  | Andq -> () 
-  | Shlq -> ()
-  | Sarq -> ()
-  | Shrq -> ()    
-  | Jmp -> ()
-  | J j -> ()
-  | Cmpq -> ()
-  | Set s -> ()
-  | Callq -> ()
-  | Retq -> ()
-  end
+  | Addq -> src_dest m oprnd_lst Int64_overflow.add
+  | Subq -> src_dest m oprnd_lst Int64_overflow.sub
+  | Imulq -> src_dest m oprnd_lst Int64_overflow.mul
+  | Movq -> () (* SRC DEST *)
+  | Pushq -> () (* SRC DEST *)
+  | Popq -> () (* SRC DEST *)
+  | Leaq -> () (* SRC DEST *)
+  | Incq -> () (* SRC *)
+  | Decq -> () (* SRC *)
+  | Negq -> () (* DEST *)
+  | Notq -> () (* DEST *)
+  | Xorq -> () (* SRC DEST *)
+  | Orq -> () (* SRC DEST *)
+  | Andq -> () (* SRC DEST *)
+  | Shlq -> () (* AMT DEST *)
+  | Sarq -> () (* AMT DEST *)
+  | Shrq -> ()  (* AMT DEST *)
+  | Jmp -> () (* SRC DEST *)
+  | J j -> () (* CC, DEST *)
+  | Cmpq -> () (* SRC1 SRC2 *) (* FLAGS *)
+  | Set s -> () (* CC, DEST *)
+  | Callq -> () (* SRC DEST *)
+  | Retq -> () (* RET *)
+  end in 
+
 
 
 (* Update flags *)
