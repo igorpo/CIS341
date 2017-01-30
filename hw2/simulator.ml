@@ -131,6 +131,14 @@ let sbytes_of_data : data -> sbyte list = function
    simulator. *)
 let debug_simulator = ref true
 
+(* rip increment *)
+let rip_incr (m:mach) : unit =
+  let prev_rip = m.regs.(rind Rip) in 
+  m.regs.(rind Rip) <- Int64.add prev_rip ins_size
+
+let sign (r:int64) : bool =
+  (Int64.shift_right_logical r 63) = 1L
+
 (* Interpret a condition code with respect to the given flags. *)
 let interp_cnd {fo; fs; fz} : cnd -> bool = fun x -> 
   begin match x with 
@@ -152,11 +160,17 @@ let map_addr (addr:quad) : int option =
   else
     None 
 
+let resolve_addr_loc (v:int64) (offset:int64) : int =
+  begin match map_addr v with
+  | Some s -> s + (Int64.to_int offset)
+  | None -> failwith "Attempted to unwrap nil"
+  end
+
 (* Resolve the correction of addresses used with indirects
     or raise exception where necessary *)
-let resolve_addr (v:int64) (offset:int64) (m:mach)  : int64 = 
+let resolve_addr (v:int64) (offset:int64) (m:mach) : int64 = 
   begin match map_addr v with 
-  | Some s -> int64_of_sbytes [m.mem.(s)]
+  | Some s -> int64_of_sbytes [m.mem.(s + (Int64.to_int offset))]
   | None -> raise X86lite_segfault
   end
 
@@ -177,26 +191,58 @@ let interp_operand (op:operand) (m:mach) : int64 =
   | Ind3 (i, r) -> resolve_addr m.regs.(rind r) (valid_lit i) m
   end
 
+let set_mem (op:operand) (v:int64) (m:mach) : unit =
+  let v_bytes = Array.of_list (sbytes_of_int64 v) in
+  let len = Array.length v_bytes in 
+  begin match op with
+  | Reg r -> m.regs.(rind r) <- v
+  | Ind1 i -> 
+    let idx = resolve_addr_loc v 0L in 
+    Array.blit v_bytes 0 m.mem idx len;
+  | Ind2 r ->
+    let idx = resolve_addr_loc m.regs.(rind r) 0L in 
+    Array.blit v_bytes 0 m.mem idx len;
+  | Ind3 (i, r) ->
+    let idx = resolve_addr_loc m.regs.(rind r) (valid_lit i) in 
+    Array.blit v_bytes 0 m.mem idx len;
+  | _ -> failwith "Not a register or mem address"
+  end
 
-let src_dest (m:mach) (o:operand list) (f:function) : unit =
+(* dummy function to convert all arithmetic ops into one clean func *)
+let dummy (f:int64 -> Int64_overflow.t) : int64 -> int64 -> Int64_overflow.t =
+  let g (x:int64) (y:int64) : Int64_overflow.t = f x in g
+
+let arith_ops (m:mach) (o: operand list) (f) : 
+                (int64 * int64 * int64 * bool) =
+  let open Int64_overflow in
   begin match o with
   | s::d::[] -> 
-    let SRC = interp_operand s m in
-    let DEST = interp_operand d m in
-    let result = f SRC DEST in
-    let value = result.value in
-    let of = result.overflow in
-
-
+    let src = interp_operand s m in
+    let dest = interp_operand d m in
+    let res = f src dest in 
+    set_mem d res.value m;
+    (src, dest, res.value, res.overflow)
+  | s::[] -> 
+    let src = interp_operand s m in
+    let res = f src 0L in 
+    set_mem s res.value m;
+    (src, 0L, res.value, res.overflow)
   | _ -> failwith "Cannot have more than two operands in this list"
   end
-  
-
-  
-  
 
 
-let update_state 
+(* Update flags *)
+let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
+  f.fo <- fo; f.fs <- fs; f.fz <- fz    
+
+(* Simulates one step of the machine:
+    - fetch the instruction at %rip
+    - compute the source and/or destination information from the operands
+    - simulate the instruction semantics
+    - update the registers and/or memory appropriately
+    - set the condition flags
+*)
+
 (* Interprets instruction *)
 (*     
     - perform instruction
@@ -204,18 +250,46 @@ let update_state
     - set the condition flags 
 *)
 let exec_ins (inst:ins) (m:mach) : unit =
-  let op_code, oprnd_lst = inst in 
+  let op_code, oprnd_list = inst in 
   begin match op_code with
-  | Addq -> src_dest m oprnd_lst Int64_overflow.add
-  | Subq -> src_dest m oprnd_lst Int64_overflow.sub
-  | Imulq -> src_dest m oprnd_lst Int64_overflow.mul
+  | Addq ->
+    let res = arith_ops m oprnd_list Int64_overflow.add in
+    let dest, _, value, overflow = res in
+    update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Subq ->
+    let res = arith_ops m oprnd_list Int64_overflow.sub in
+    let src, _, value, overflow = res in
+    let fo = overflow || (src = Int64.min_int) in
+    update_flags m.flags fo (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Imulq ->
+    let res = arith_ops m oprnd_list Int64_overflow.mul in
+    let _, _, value, overflow = res in
+    update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Negq -> 
+    let res = arith_ops m oprnd_list (dummy Int64_overflow.neg) in
+    let dest, _, value, overflow = res in
+    let fo = overflow || (dest = Int64.min_int) in
+    update_flags m.flags fo (sign value) (value = Int64.zero);
+    rip_incr m;    
+  | Decq -> 
+    let res = arith_ops m oprnd_list (dummy Int64_overflow.pred) in
+    let src, _, value, overflow = res in
+    let fo = overflow || (src = Int64.min_int) in
+    update_flags m.flags fo (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Incq -> 
+    let res = arith_ops m oprnd_list (dummy Int64_overflow.succ) in
+    let src, dest, value, overflow = res in
+    update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+
   | Movq -> () (* SRC DEST *)
   | Pushq -> () (* SRC DEST *)
   | Popq -> () (* SRC DEST *)
   | Leaq -> () (* SRC DEST *)
-  | Incq -> () (* SRC *)
-  | Decq -> () (* SRC *)
-  | Negq -> () (* DEST *)
   | Notq -> () (* DEST *)
   | Xorq -> () (* SRC DEST *)
   | Orq -> () (* SRC DEST *)
@@ -229,26 +303,9 @@ let exec_ins (inst:ins) (m:mach) : unit =
   | Set s -> () (* CC, DEST *)
   | Callq -> () (* SRC DEST *)
   | Retq -> () (* RET *)
-  end in 
+  end
 
 
-
-(* Update flags *)
-let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
-  f.fo <- fo; f.fs <- fs; f.fz <- fz    
-
-(* Initializes machine state *)
-let init_state (m:mach) : unit =
-  update_flags m.flags false false false
-
-
-(* Simulates one step of the machine:
-    - fetch the instruction at %rip
-    - compute the source and/or destination information from the operands
-    - simulate the instruction semantics
-    - update the registers and/or memory appropriately
-    - set the condition flags
-*)
 
 let step (m:mach) : unit =
   let rip = m.regs.(rind Rip) in
@@ -483,10 +540,3 @@ let load {entry; text_pos; data_pos; text_seg; data_seg} : mach =
   reg_arr.(rind Rip) <- entry;
   reg_arr.(rind Rsp) <- Int64.sub mem_top 8L; 
   {mem=mem_arr; regs=reg_arr; flags={fo=false;fs=false;fz=false;}}
-
-
-
-
-
-
-
