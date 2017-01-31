@@ -187,17 +187,16 @@ let rec accum_sbyte (l:sbyte list) : string =
   | [] -> ""
   end
 
+(* accumulate the 64 bit value from mem *)
 let get_64_bit_mem (m:mach) (l:int64) (o:int64) : sbyte list =
-  if o = 0L then 
-    [m.mem.(resolve_addr_loc l 0L); m.mem.(resolve_addr_loc l 1L);
-    m.mem.(resolve_addr_loc l 2L); m.mem.(resolve_addr_loc l 3L);
-    m.mem.(resolve_addr_loc l 4L); m.mem.(resolve_addr_loc l 5L);
-    m.mem.(resolve_addr_loc l 6L); m.mem.(resolve_addr_loc l 7L)]
-  else 
-    [m.mem.(resolve_addr_loc l o); m.mem.(resolve_addr_loc l (Int64.add o 1L));
-    m.mem.(resolve_addr_loc l (Int64.add o 2L)); m.mem.(resolve_addr_loc l (Int64.add o 3L));
-    m.mem.(resolve_addr_loc l (Int64.add o 4L)); m.mem.(resolve_addr_loc l (Int64.add o 5L));
-    m.mem.(resolve_addr_loc l (Int64.add o 6L)); m.mem.(resolve_addr_loc l (Int64.add o 7L))]
+    [m.mem.(resolve_addr_loc l o); 
+    m.mem.(resolve_addr_loc l (Int64.add o 1L));
+    m.mem.(resolve_addr_loc l (Int64.add o 2L));
+    m.mem.(resolve_addr_loc l (Int64.add o 3L));
+    m.mem.(resolve_addr_loc l (Int64.add o 4L)); 
+    m.mem.(resolve_addr_loc l (Int64.add o 5L));
+    m.mem.(resolve_addr_loc l (Int64.add o 6L)); 
+    m.mem.(resolve_addr_loc l (Int64.add o 7L))]
 
 let get_mem_one_byte (m:mach) (l:int64) (offset:int64) : sbyte = 
   m.mem.(resolve_addr_loc l offset)
@@ -489,7 +488,7 @@ let handle_data (t:int64 * map * sbyte list)
   begin match e.asm with
     | Data d -> 
       let size_text, _map, data_seg = t in
-      let label = e.lbl in (* lbl to be resolved *)
+      let label = e.lbl in
       let new_map = 
         if not (map_contains _map label) then 
         (* update map *)
