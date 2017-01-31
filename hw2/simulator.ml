@@ -156,9 +156,11 @@ let interp_cnd {fo; fs; fz} : cnd -> bool = fun x ->
    or None if the address is not within the legal address space. *)
 let map_addr (addr:quad) : int option =
   let addr_check = addr >= mem_bot && addr < mem_top in
+  (* Printf.printf "result %b with addr %Ld\n" (addr_check) (addr); *)
   if addr_check then
     Some (Int64.to_int (Int64.sub addr mem_bot))
   else
+
     None 
 
 let resolve_addr_loc (v:int64) (offset:int64) : int =
@@ -200,7 +202,8 @@ let interp_operand (op:operand) (m:mach) : int64 =
 let get_val_from_loc (m:mach) (op:operand) : int64 =
   begin match op with
   | Reg r -> m.regs.(rind r)
-  | Imm i | Ind1 i -> int64_of_sbytes [get_mem m (valid_lit i) 0L]
+  | Imm i -> valid_lit i
+  | Ind1 i -> int64_of_sbytes [get_mem m (valid_lit i) 0L]
   | Ind2 r -> int64_of_sbytes [get_mem m m.regs.(rind r) 0L] 
   | Ind3 (i,r) -> 
     Printf.printf "DIS SHIT FAILS HERE\n";
@@ -227,7 +230,7 @@ let set_val_in_loc (v:int64) (op:operand) (m:mach) : unit =
   begin match op with
   | Reg r -> m.regs.(rind r) <- v
   | Ind1 i -> 
-    let idx = resolve_addr_loc v 0L in 
+    let idx = resolve_addr_loc (valid_lit i) 0L in 
     Array.blit v_bytes 0 m.mem idx len;
   | Ind2 r ->
     let idx = resolve_addr_loc m.regs.(rind r) 0L in 
