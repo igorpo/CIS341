@@ -188,7 +188,9 @@ let rec accum_sbyte (l:sbyte list) : string =
   | [] -> ""
   end
 
+
 let get_mem (m:mach) (l:int64) (offset:int64): sbyte = 
+  (* TODO: retrieve correct # of bytes and concat them *)
   m.mem.(resolve_addr_loc l offset)
 
 (* Interprets operands *)
@@ -208,9 +210,8 @@ let get_val_from_loc (m:mach) (op:operand) : int64 =
   | Ind3 (i,r) -> 
     Printf.printf "DIS SHIT FAILS HERE\n";
     let bytes = get_mem m m.regs.(rind r) (valid_lit i) in
-    Printf.printf "DIS SHIT FAILS HERE TOO TOO\n";
-    int64_of_sbytes [bytes]
-    
+    let v = int64_of_sbytes [bytes] in
+    Printf.printf "VALUE FROM IND3 === %Ld with offset %Ld \n" (v) (valid_lit i); v
   end
 
 (* (* Resolve the correction of addresses used with indirects
@@ -237,13 +238,14 @@ let set_val_in_loc (v:int64) (op:operand) (m:mach) : unit =
     Array.blit v_bytes 0 m.mem idx len;
   | Ind3 (i, r) ->
     let idx = resolve_addr_loc m.regs.(rind r) (valid_lit i) in 
-    Array.blit v_bytes 0 m.mem idx len;
+    Array.blit v_bytes 0 m.mem idx len; 
+    (* Printf.printf "setting this value: %Ld\n" (int64_of_sbytes (Array.to_list v_bytes)); *)
   | _ -> failwith "Not a register or mem address"
   end
 
 (* dummy function to convert all arithmetic ops into one clean func *)
-let dummy (f:int64 -> Int64_overflow.t) : int64 -> int64 -> Int64_overflow.t =
-  let g (x:int64) (y:int64) : Int64_overflow.t = f x in g
+let two_arg_to_3 (f) =
+  let g (x) (y) = f x in g
 
 let arith_ops (m:mach) (o: operand list) (f) : 
                 (int64 * int64 * int64 * bool) =
@@ -251,34 +253,57 @@ let arith_ops (m:mach) (o: operand list) (f) :
   begin match o with
   | s::d::[] -> 
     let src = get_val_from_loc m s in
-    Printf.printf "src ====== %Ld\n" (src);
+    (* Printf.printf "src ====== %Ld\n" (src); *)
     let dest = get_val_from_loc m d in
-    Printf.printf "dest ====== %Ld\n" (dest);
-    let res = f src dest in 
+    (* Printf.printf "dest ====== %Ld\n" (dest); *)
+    let res = f dest src in 
     set_val_in_loc res.value d m;
-    Printf.printf "****set_val_in_loc done   1  ****\n";
+    (* Printf.printf "****set_val_in_loc done   1  ****\n"; *)
     (src, dest, res.value, res.overflow)
   | s::[] -> 
     let src = get_val_from_loc m s in
     let res = f src 0L in 
     set_val_in_loc res.value s m;
-    Printf.printf "****set_val_in_loc done   2  ****\n";
+    (* Printf.printf "****set_val_in_loc done   2  ****\n"; *)
     (src, 0L, res.value, res.overflow)
   | _ -> failwith "Cannot have more than two operands in this list"
   end
 
 
+
+(* Logic instructions *)
+let logic_ops (m:mach) (o:operand list) (f): 
+                    (int64 * int64 * int64 * bool) =
+  begin match o with
+  | s::d::[] -> 
+    let src = get_val_from_loc m s in
+    let dest = get_val_from_loc m d in
+    let result = f src dest in 
+    set_val_in_loc result d m;
+    (src, dest, result, false)
+  | s::[] -> 
+    let src = get_val_from_loc m s in
+    let result = f src 0L in 
+    set_val_in_loc result s m;
+    (* Printf.printf "****set_val_in_loc done   2  ****\n"; *)
+    (src, 0L, result, false)
+  | _ -> failwith "Cannot have more than two operands in this list"
+  end
+
+(* Data movement instructions *)
+let data_mov_ops (m:mach) (o:operand list) : unit = 
+  begin match o with
+  | s::d::[] -> 
+    let src = get_val_from_loc m s in
+    set_val_in_loc src d m;
+  | s::[] -> ()
+  | _ -> failwith "Cannot have more than two operands in this list"
+  end
 (* Update flags *)
 let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
   f.fo <- fo; f.fs <- fs; f.fz <- fz    
 
-(* Simulates one step of the machine:
-    - fetch the instruction at %rip
-    - compute the source and/or destination information from the operands
-    - simulate the instruction semantics
-    - update the registers and/or memory appropriately
-    - set the condition flags
-*)
+
 
 (* Interprets instruction *)
 (*     
@@ -311,33 +336,55 @@ let exec_ins (inst:ins) (m:mach) : unit =
     rip_incr m;
   | Negq -> 
     Printf.printf "OP === Negq\n";
-    let res = arith_ops m oprnd_list (dummy Int64_overflow.neg) in
+    let res = arith_ops m oprnd_list (two_arg_to_3 Int64_overflow.neg) in
     let dest, _, value, overflow = res in
     let fo = overflow || (dest = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
     rip_incr m;    
   | Decq -> 
     Printf.printf "OP === Decq\n";
-    let res = arith_ops m oprnd_list (dummy Int64_overflow.pred) in
+    let res = arith_ops m oprnd_list (two_arg_to_3 Int64_overflow.pred) in
     let src, _, value, overflow = res in
     let fo = overflow || (src = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
     rip_incr m;
   | Incq -> 
     Printf.printf "OP === Incq\n";
-    let res = arith_ops m oprnd_list (dummy Int64_overflow.succ) in
+    let res = arith_ops m oprnd_list (two_arg_to_3 Int64_overflow.succ) in
     let src, dest, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
     rip_incr m;
-
-  | Movq -> () (* SRC DEST *)
+  | Andq -> 
+    Printf.printf "OP === Andq\n";
+    let res = logic_ops m oprnd_list Int64.logand in
+    let src, dest, value, overflow = res in
+    update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Xorq -> 
+    Printf.printf "OP === Xorq\n";
+    let res = logic_ops m oprnd_list Int64.logxor in
+    let src, dest, value, overflow = res in
+    update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Orq -> 
+    Printf.printf "OP === Orq\n";
+    let res = logic_ops m oprnd_list Int64.logor in
+    let src, dest, value, overflow = res in
+    update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Notq -> 
+    Printf.printf "OP === Notq\n";
+    let res = logic_ops m oprnd_list (two_arg_to_3 Int64.lognot) in
+    let src, dest, value, overflow = res in
+    update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Movq -> 
+    Printf.printf "OP === Movq\n";
+    data_mov_ops m oprnd_list;
+    rip_incr m;
   | Pushq -> () (* SRC DEST *)
   | Popq -> () (* SRC DEST *)
   | Leaq -> () (* SRC DEST *)
-  | Notq -> () (* DEST *)
-  | Xorq -> () (* SRC DEST *)
-  | Orq -> () (* SRC DEST *)
-  | Andq -> () (* SRC DEST *)
   | Shlq -> () (* AMT DEST *)
   | Sarq -> () (* AMT DEST *)
   | Shrq -> ()  (* AMT DEST *)
@@ -349,6 +396,13 @@ let exec_ins (inst:ins) (m:mach) : unit =
   | Retq -> () (* RET *)
   end
 
+(* Simulates one step of the machine:
+    - fetch the instruction at %rip
+    - compute the source and/or destination information from the operands
+    - simulate the instruction semantics
+    - update the registers and/or memory appropriately
+    - set the condition flags
+*)
 let step (m:mach) : unit =
   let next_ins_location = m.regs.(rind Rip) in
   Printf.printf "next_ins_location === 0x%Lx\n" (next_ins_location);

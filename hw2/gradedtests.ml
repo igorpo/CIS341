@@ -287,7 +287,7 @@ let instruction_tests = [
   ("mov_mr", machine_test "*65520=42" 2 mov_mr
     (fun m -> int64_of_sbytes (sbyte_list m.mem (mem_size-16)) = 42L)
   );
- 
+
   ("subq", machine_test "rax=*65528=-1L; rbx=1" 3 subq
     (fun m -> m.regs.(rind Rax) = (Int64.neg 1L)
            && m.regs.(rind Rbx) = 1L
@@ -302,10 +302,21 @@ let instruction_tests = [
     )
   );
 
+  (* let negq = test_machine
+    [InsB0 (Movq, [~$42; ~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Movq, [~$(-24); stack_offset 0L]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Movq, [Imm (Lit Int64.min_int); ~%Rbx]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Negq, [~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Negq, [stack_offset 0L]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Negq, [~%Rbx]);InsFrag;InsFrag;InsFrag
+    ] *)
+
   ("negq", machine_test "rax=-42 rbx=min_int64 *65528=24" 6 negq
-    (fun m -> m.regs.(rind Rax) = Int64.neg 42L
+    (fun m -> 
+          m.regs.(rind Rax) = Int64.neg 42L
            && m.regs.(rind Rbx) = Int64.min_int
-           && int64_of_sbytes (sbyte_list m.mem (mem_size-8)) = 24L
+           && int64_of_sbytes (sbyte_list m.mem (mem_size-8)) = 24L;
+
     )
   );
 

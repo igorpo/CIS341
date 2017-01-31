@@ -206,9 +206,9 @@ let add = test_machine
 
 
 let functionality_tests = [
-  (* ("mov_ri", machine_test "rax=42" 1 mov_ri
+  ("mov_ri", machine_test "rax=42" 1 mov_ri
     (fun m -> m.regs.(rind Rax) = 42L)
-  ); *)
+  );
 
   ("add", machine_test "rax=rbx=*66528=1" 3 add
     (fun m -> m.regs.(rind Rax) = 1L
@@ -243,7 +243,7 @@ let andq = test_machine
 
 let negq = test_machine
     [InsB0 (Movq, [~$42; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Movq, [~$(-24); stack_offset 0L]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Movq, [~$(256); stack_offset 0L]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Movq, [Imm (Lit Int64.min_int); ~%Rbx]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Negq, [~%Rax]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Negq, [stack_offset 0L]);InsFrag;InsFrag;InsFrag
@@ -284,10 +284,10 @@ let cmpq = test_machine
     ]
 
 let instruction_tests = [
-  ("mov_mr", machine_test "*65520=42" 2 mov_mr
+  (* ("mov_mr", machine_test "*65520=42" 2 mov_mr
     (fun m -> int64_of_sbytes (sbyte_list m.mem (mem_size-16)) = 42L)
   );
- 
+
   ("subq", machine_test "rax=*65528=-1L; rbx=1" 3 subq
     (fun m -> m.regs.(rind Rax) = (Int64.neg 1L)
            && m.regs.(rind Rbx) = 1L
@@ -301,15 +301,30 @@ let instruction_tests = [
            && int64_of_sbytes (sbyte_list m.mem (mem_size-8)) = 1L
     )
   );
+ *)
+
+
+
+  (* let negq = test_machine
+    [InsB0 (Movq, [~$42; ~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Movq, [~$(-24); stack_offset 0L]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Movq, [Imm (Lit Int64.min_int); ~%Rbx]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Negq, [~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Negq, [stack_offset 0L]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Negq, [~%Rbx]);InsFrag;InsFrag;InsFrag
+    ] *)
 
   ("negq", machine_test "rax=-42 rbx=min_int64 *65528=24" 6 negq
-    (fun m -> m.regs.(rind Rax) = Int64.neg 42L
+    (fun m -> 
+          let b = m.regs.(rind Rax) = Int64.neg 42L
            && m.regs.(rind Rbx) = Int64.min_int
-           && int64_of_sbytes (sbyte_list m.mem (mem_size-8)) = 24L
-    )
+           && int64_of_sbytes (sbyte_list m.mem (mem_size-8)) = 24L in 
+           Printf.printf "THIS IS THE ROGUE VALUE %Ld" (int64_of_sbytes (sbyte_list m.mem (mem_size-8))); b
+    ) 
+    
   );
 
-  ("shl", machine_test "rax=4 *65528=16" 5 shl
+  (* ("shl", machine_test "rax=4 *65528=16" 5 shl
     (fun m -> m.regs.(rind Rax) = 4L
            && int64_of_sbytes (sbyte_list m.mem (mem_size-8)) = 16L
     )
@@ -333,7 +348,7 @@ let instruction_tests = [
            && m.regs.(rind Rbx) = 0L
            && int64_of_sbytes (sbyte_list m.mem (mem_size-8)) = 2L
     )
-  );
+  ); *)
 ]
 
 let cc_add_1 = test_machine
@@ -457,10 +472,6 @@ let condition_flag_set_tests =
   ]
 
 (* Test Suites *)
-let ins_tests : suite = 
-  [
-  GradedTest("Functionality Tests", 5, functionality_tests);
-  ]
 
 let easy_tests : suite =
 [
@@ -481,7 +492,7 @@ let easy_tests : suite =
 ]
 
 let medium_tests : suite = [
-  GradedTest("Medium Assemble Tests", 5,[
+  (* GradedTest("Medium Assemble Tests", 5,[
     ("assemble1", assert_eqf (fun () -> (assemble helloworld).text_seg) helloworld_textseg );
     ("assemble2", undefinedsym_test [text "foo" [Retq,[]]]);
     
@@ -491,10 +502,10 @@ let medium_tests : suite = [
           let m = load test_exec in
           int64_of_sbytes (sbyte_list m.mem 0x0fff8)
     ) exit_addr);
-  ]);
-  GradedTest("Functionality Tests", 5, functionality_tests);
+  ]); *)
+  (* GradedTest("Functionality Tests", 5, functionality_tests); *)
   GradedTest("Instruction Tests", 10, instruction_tests);
-  GradedTest("Condition Flag Set Tests", 5, condition_flag_set_tests);
+  (* GradedTest("Condition Flag Set Tests", 5, condition_flag_set_tests); *)
 ]
 
 let hard_tests : suite = [
@@ -514,8 +525,7 @@ let manual_tests : suite = [
 ]
 
 let our_test : suite =
-  ins_tests
-  (* easy_tests @
-  medium_tests @
-  hard_tests @
-  manual_tests *)
+  (* easy_tests @ *)
+  medium_tests
+  (* hard_tests @ *)
+  (* manual_tests *)
