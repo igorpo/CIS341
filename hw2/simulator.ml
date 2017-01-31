@@ -129,7 +129,7 @@ let sbytes_of_data : data -> sbyte list = function
 
 (* It might be useful to toggle printing of intermediate states of your 
    simulator. *)
-let debug_simulator = ref true
+let debug_simulator = ref false
 
 (* rip increment *)
 let rip_incr (m:mach) : unit =
@@ -156,17 +156,25 @@ let interp_cnd {fo; fs; fz} : cnd -> bool = fun x ->
    or None if the address is not within the legal address space. *)
 let map_addr (addr:quad) : int option =
   let addr_check = addr >= mem_bot && addr < mem_top in
+  (* Printf.printf "result %b with addr %Ld\n" (addr_check) (addr); *)
   if addr_check then
     Some (Int64.to_int (Int64.sub addr mem_bot))
   else
+
     None 
 
 let resolve_addr_loc (v:int64) (offset:int64) : int =
-  begin match map_addr v with
-  | Some s -> s + (Int64.to_int offset)
+  begin match map_addr (Int64.add v offset) with
+  | Some s -> s 
   | None -> raise X86lite_segfault
   end
 
+(*  Convenience func for resolving lits and not labels *)
+let valid_lit (i:imm) : int64 =
+  begin match i with 
+  | Lit l -> l
+  | Lbl _ -> invalid_arg "Attempted to interpret a label"
+  end
 
 (* Printing helper *)
 let rec accum_sbyte (l:sbyte list) : string =
@@ -180,10 +188,30 @@ let rec accum_sbyte (l:sbyte list) : string =
   | [] -> ""
   end
 
+let get_mem (m:mach) (l:int64) (offset:int64): sbyte = 
+  m.mem.(resolve_addr_loc l offset)
 
+(* Interprets operands *)
+let interp_operand (op:operand) (m:mach) : int64 =
+  begin match op with
+  | Imm i | Ind1 i -> valid_lit i
+  | Reg r | Ind2 r -> m.regs.(rind r)
+  | Ind3 (i, r) -> Int64.add m.regs.(rind r) (valid_lit i)
+  end
 
-let get_mem (m:mach) (l:int64) (o:int64): sbyte = 
-  m.mem.(resolve_addr_loc l o)
+let get_val_from_loc (m:mach) (op:operand) : int64 =
+  begin match op with
+  | Reg r -> m.regs.(rind r)
+  | Imm i -> valid_lit i
+  | Ind1 i -> int64_of_sbytes [get_mem m (valid_lit i) 0L]
+  | Ind2 r -> int64_of_sbytes [get_mem m m.regs.(rind r) 0L] 
+  | Ind3 (i,r) -> 
+    Printf.printf "DIS SHIT FAILS HERE\n";
+    let bytes = get_mem m m.regs.(rind r) (valid_lit i) in
+    Printf.printf "DIS SHIT FAILS HERE TOO TOO\n";
+    int64_of_sbytes [bytes]
+    
+  end
 
 (* (* Resolve the correction of addresses used with indirects
     or raise exception where necessary *)
@@ -196,29 +224,13 @@ let get_mem (v:int64) (offset:int64) (m:mach) : sbyte =
   | None -> raise X86lite_segfault
   end *)
 
-
-(*  Convenience func for resolving lits and not labels *)
-let valid_lit (i:imm) : int64 =
-  begin match i with 
-  | Lit l -> l
-  | Lbl _ -> invalid_arg "Attempted to interpret a label"
-  end
-
-(* Interprets operands *)
-let interp_operand (op:operand) (m:mach) : int64 =
-  begin match op with
-  | Imm i | Ind1 i -> valid_lit i
-  | Reg r | Ind2 r -> m.regs.(rind r)
-  | Ind3 (i, r) -> Int64.add m.regs.(rind r) (valid_lit i)
-  end
-
-let set_mem (op:operand) (v:int64) (m:mach) : unit =
+let set_val_in_loc (v:int64) (op:operand) (m:mach) : unit =
   let v_bytes = Array.of_list (sbytes_of_int64 v) in
   let len = Array.length v_bytes in 
   begin match op with
   | Reg r -> m.regs.(rind r) <- v
   | Ind1 i -> 
-    let idx = resolve_addr_loc v 0L in 
+    let idx = resolve_addr_loc (valid_lit i) 0L in 
     Array.blit v_bytes 0 m.mem idx len;
   | Ind2 r ->
     let idx = resolve_addr_loc m.regs.(rind r) 0L in 
@@ -238,15 +250,19 @@ let arith_ops (m:mach) (o: operand list) (f) :
   let open Int64_overflow in
   begin match o with
   | s::d::[] -> 
-    let src = interp_operand s m in
-    let dest = interp_operand d m in
+    let src = get_val_from_loc m s in
+    Printf.printf "src ====== %Ld\n" (src);
+    let dest = get_val_from_loc m d in
+    Printf.printf "dest ====== %Ld\n" (dest);
     let res = f src dest in 
-    set_mem d res.value m;
+    set_val_in_loc res.value d m;
+    Printf.printf "****set_val_in_loc done   1  ****\n";
     (src, dest, res.value, res.overflow)
   | s::[] -> 
-    let src = interp_operand s m in
+    let src = get_val_from_loc m s in
     let res = f src 0L in 
-    set_mem s res.value m;
+    set_val_in_loc res.value s m;
+    Printf.printf "****set_val_in_loc done   2  ****\n";
     (src, 0L, res.value, res.overflow)
   | _ -> failwith "Cannot have more than two operands in this list"
   end
@@ -276,6 +292,7 @@ let exec_ins (inst:ins) (m:mach) : unit =
   | Addq ->
     Printf.printf "OP === Addq\n";
     let res = arith_ops m oprnd_list Int64_overflow.add in
+    Printf.printf "****   Addq got result  ****\n";
     let dest, _, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
     rip_incr m;
