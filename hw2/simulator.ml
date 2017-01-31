@@ -160,7 +160,6 @@ let map_addr (addr:quad) : int option =
   if addr_check then
     Some (Int64.to_int (Int64.sub addr mem_bot))
   else
-
     None 
 
 let resolve_addr_loc (v:int64) (offset:int64) : int =
@@ -188,9 +187,19 @@ let rec accum_sbyte (l:sbyte list) : string =
   | [] -> ""
   end
 
+let get_64_bit_mem (m:mach) (l:int64) (o:int64) : sbyte list =
+  if o = 0L then 
+    [m.mem.(resolve_addr_loc l 0L); m.mem.(resolve_addr_loc l 1L);
+    m.mem.(resolve_addr_loc l 2L); m.mem.(resolve_addr_loc l 3L);
+    m.mem.(resolve_addr_loc l 4L); m.mem.(resolve_addr_loc l 5L);
+    m.mem.(resolve_addr_loc l 6L); m.mem.(resolve_addr_loc l 7L)]
+  else 
+    [m.mem.(resolve_addr_loc l o); m.mem.(resolve_addr_loc l (Int64.add o 1L));
+    m.mem.(resolve_addr_loc l (Int64.add o 2L)); m.mem.(resolve_addr_loc l (Int64.add o 3L));
+    m.mem.(resolve_addr_loc l (Int64.add o 4L)); m.mem.(resolve_addr_loc l (Int64.add o 5L));
+    m.mem.(resolve_addr_loc l (Int64.add o 6L)); m.mem.(resolve_addr_loc l (Int64.add o 7L))]
 
-let get_mem (m:mach) (l:int64) (offset:int64): sbyte = 
-  (* TODO: retrieve correct # of bytes and concat them *)
+let get_mem_one_byte (m:mach) (l:int64) (offset:int64) : sbyte = 
   m.mem.(resolve_addr_loc l offset)
 
 (* Interprets operands *)
@@ -205,26 +214,14 @@ let get_val_from_loc (m:mach) (op:operand) : int64 =
   begin match op with
   | Reg r -> m.regs.(rind r)
   | Imm i -> valid_lit i
-  | Ind1 i -> int64_of_sbytes [get_mem m (valid_lit i) 0L]
-  | Ind2 r -> int64_of_sbytes [get_mem m m.regs.(rind r) 0L] 
+  | Ind1 i -> int64_of_sbytes (get_64_bit_mem m (valid_lit i) 0L)
+  | Ind2 r -> int64_of_sbytes (get_64_bit_mem m m.regs.(rind r) 0L)  
   | Ind3 (i,r) -> 
-    Printf.printf "DIS SHIT FAILS HERE\n";
-    let bytes = get_mem m m.regs.(rind r) (valid_lit i) in
-    let v = int64_of_sbytes [bytes] in
-    Printf.printf "VALUE FROM IND3 === %Ld with offset %Ld \n" (v) (valid_lit i); v
+    let bytes = get_64_bit_mem m m.regs.(rind r) (valid_lit i) in
+    int64_of_sbytes bytes
   end
 
-(* (* Resolve the correction of addresses used with indirects
-    or raise exception where necessary *)
-let get_mem (v:int64) (offset:int64) (m:mach) : sbyte = 
-  begin match map_addr v with 
-  | Some s -> 
-    let ins = m.mem.(s + (Int64.to_int offset)) in
-    Printf.printf "resolve addr ins ==== %s\n\n" (accum_sbyte [ins]);
-    ins
-  | None -> raise X86lite_segfault
-  end *)
-
+(* Set a value into memory properly *)
 let set_val_in_loc (v:int64) (op:operand) (m:mach) : unit =
   let v_bytes = Array.of_list (sbytes_of_int64 v) in
   let len = Array.length v_bytes in 
@@ -239,7 +236,6 @@ let set_val_in_loc (v:int64) (op:operand) (m:mach) : unit =
   | Ind3 (i, r) ->
     let idx = resolve_addr_loc m.regs.(rind r) (valid_lit i) in 
     Array.blit v_bytes 0 m.mem idx len; 
-    (* Printf.printf "setting this value: %Ld\n" (int64_of_sbytes (Array.to_list v_bytes)); *)
   | _ -> failwith "Not a register or mem address"
   end
 
@@ -247,24 +243,21 @@ let set_val_in_loc (v:int64) (op:operand) (m:mach) : unit =
 let two_arg_to_3 (f) =
   let g (x) (y) = f x in g
 
+(* handle arithmetic operations *)
 let arith_ops (m:mach) (o: operand list) (f) : 
                 (int64 * int64 * int64 * bool) =
   let open Int64_overflow in
   begin match o with
   | s::d::[] -> 
     let src = get_val_from_loc m s in
-    (* Printf.printf "src ====== %Ld\n" (src); *)
     let dest = get_val_from_loc m d in
-    (* Printf.printf "dest ====== %Ld\n" (dest); *)
     let res = f dest src in 
     set_val_in_loc res.value d m;
-    (* Printf.printf "****set_val_in_loc done   1  ****\n"; *)
     (src, dest, res.value, res.overflow)
   | s::[] -> 
     let src = get_val_from_loc m s in
     let res = f src 0L in 
     set_val_in_loc res.value s m;
-    (* Printf.printf "****set_val_in_loc done   2  ****\n"; *)
     (src, 0L, res.value, res.overflow)
   | _ -> failwith "Cannot have more than two operands in this list"
   end
@@ -285,7 +278,6 @@ let logic_ops (m:mach) (o:operand list) (f):
     let src = get_val_from_loc m s in
     let result = f src 0L in 
     set_val_in_loc result s m;
-    (* Printf.printf "****set_val_in_loc done   2  ****\n"; *)
     (src, 0L, result, false)
   | _ -> failwith "Cannot have more than two operands in this list"
   end
@@ -406,11 +398,10 @@ let exec_ins (inst:ins) (m:mach) : unit =
 let step (m:mach) : unit =
   let next_ins_location = m.regs.(rind Rip) in
   Printf.printf "next_ins_location === 0x%Lx\n" (next_ins_location);
-  let inst = get_mem m next_ins_location 0L in
-  (* let inst = sbytes_of_int64 (resolve_addr next_ins_location 0L m) in *)
+  let inst = get_mem_one_byte m next_ins_location 0L in
   begin match inst with
   | InsB0 i -> Printf.printf "inst === %s\n" (string_of_ins i); exec_ins i m;
-  | _ -> () (* TODO: do we need to anything with byte?? *)
+  | _ -> ()
   end
 
 
@@ -532,9 +523,6 @@ let resolve_lbl (m:map * operand list) (o:operand) : (map * operand list) =
 let patch_ins (m:map * sbyte list) (i:ins) : (map * sbyte list) =
   (* _map = same symbol table; sbyte_l = accumlated sbyte list*)
   let _map, sbyte_l = m in 
-  (* i = instruction in question *)
-  (* op = the opcode, opr_l = yet to be patched operand list *)
-  (* Printf.printf "INSTRUCTION: %s\n" (string_of_ins i); *)
   let op, opr_l = i in
   let _, patched_opr_l = List.fold_left resolve_lbl (_map, []) opr_l in
   (_map, sbyte_l @ sbytes_of_ins (op, patched_opr_l))
@@ -553,7 +541,7 @@ let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
   begin match e.asm with
   (* fold on map, t with patch_ins*)
   | Text t -> 
-    let label = e.lbl in (* labels such as main, foo*)
+    let label = e.lbl in 
     let new_map = 
       if not (map_contains _map label) then 
         let list_size = Int64.of_int (List.length text_seg) in
@@ -597,8 +585,6 @@ let resolve_symbols (p:prog) (s:int64) : (quad * sbyte list * sbyte list) =
 let assemble (p:prog) : exec =
   let size_text, size_data = List.fold_left compute_size (0L, 0L) p in
   let main, text_seg, data_seg = resolve_symbols p size_text in
-    (* Printf.printf "%s\n\n\n\n" (string_of_prog p);
-    Printf.printf "%s\n\n\n\n" (accum_sbyte text_seg); *)
     {entry=main; text_pos=mem_bot; 
     data_pos=Int64.add mem_bot size_text;
     text_seg=text_seg; data_seg=data_seg}
