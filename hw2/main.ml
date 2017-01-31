@@ -6,7 +6,8 @@ open Simulator
 exception Ran_tests
 let worklist = ref []
 
-let suite = ref (Providedtests.provided_tests @ Gradedtests.graded_tests)
+(* let suite = ref (Providedtests.provided_tests @ Gradedtests.graded_tests) *)
+let suite = ref (Ourtest.our_test)
 
 let exec_tests () =
   let o = run_suite !suite in

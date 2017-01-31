@@ -133,7 +133,8 @@ let debug_simulator = ref true
 
 (* rip increment *)
 let rip_incr (m:mach) : unit =
-  let prev_rip = m.regs.(rind Rip) in 
+  let prev_rip = m.regs.(rind Rip) in
+  Printf.printf "prev_rip ==== 0x%Lx\n" (prev_rip); 
   m.regs.(rind Rip) <- Int64.add prev_rip ins_size
 
 let sign (r:int64) : bool =
@@ -163,16 +164,38 @@ let map_addr (addr:quad) : int option =
 let resolve_addr_loc (v:int64) (offset:int64) : int =
   begin match map_addr v with
   | Some s -> s + (Int64.to_int offset)
-  | None -> failwith "Attempted to unwrap nil"
-  end
-
-(* Resolve the correction of addresses used with indirects
-    or raise exception where necessary *)
-let resolve_addr (v:int64) (offset:int64) (m:mach) : int64 = 
-  begin match map_addr v with 
-  | Some s -> int64_of_sbytes [m.mem.(s + (Int64.to_int offset))]
   | None -> raise X86lite_segfault
   end
+
+
+(* Printing helper *)
+let rec accum_sbyte (l:sbyte list) : string =
+  begin match l with
+  | h::tl -> 
+    begin match h with 
+    | InsB0 i -> (string_of_ins i) ^ "; " ^ (accum_sbyte tl)
+    | InsFrag -> "InsFrag; " ^ (accum_sbyte tl)
+    | Byte b -> (String.make 1 b) ^ "; " ^ (accum_sbyte tl)
+    end
+  | [] -> ""
+  end
+
+
+
+let get_mem (m:mach) (l:int64) (o:int64): sbyte = 
+  m.mem.(resolve_addr_loc l o)
+
+(* (* Resolve the correction of addresses used with indirects
+    or raise exception where necessary *)
+let get_mem (v:int64) (offset:int64) (m:mach) : sbyte = 
+  begin match map_addr v with 
+  | Some s -> 
+    let ins = m.mem.(s + (Int64.to_int offset)) in
+    Printf.printf "resolve addr ins ==== %s\n\n" (accum_sbyte [ins]);
+    ins
+  | None -> raise X86lite_segfault
+  end *)
+
 
 (*  Convenience func for resolving lits and not labels *)
 let valid_lit (i:imm) : int64 =
@@ -184,11 +207,9 @@ let valid_lit (i:imm) : int64 =
 (* Interprets operands *)
 let interp_operand (op:operand) (m:mach) : int64 =
   begin match op with
-  | Imm i -> valid_lit i
-  | Reg r -> m.regs.(rind r)
-  | Ind1 i -> resolve_addr (valid_lit i) 0L m 
-  | Ind2 r -> resolve_addr m.regs.(rind r) 0L m
-  | Ind3 (i, r) -> resolve_addr m.regs.(rind r) (valid_lit i) m
+  | Imm i | Ind1 i -> valid_lit i
+  | Reg r | Ind2 r -> m.regs.(rind r)
+  | Ind3 (i, r) -> Int64.add m.regs.(rind r) (valid_lit i)
   end
 
 let set_mem (op:operand) (v:int64) (m:mach) : unit =
@@ -253,34 +274,40 @@ let exec_ins (inst:ins) (m:mach) : unit =
   let op_code, oprnd_list = inst in 
   begin match op_code with
   | Addq ->
+    Printf.printf "OP === Addq\n";
     let res = arith_ops m oprnd_list Int64_overflow.add in
     let dest, _, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
     rip_incr m;
   | Subq ->
+    Printf.printf "OP === Subq\n";
     let res = arith_ops m oprnd_list Int64_overflow.sub in
     let src, _, value, overflow = res in
     let fo = overflow || (src = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
     rip_incr m;
   | Imulq ->
+    Printf.printf "OP ===  Imulq\n";
     let res = arith_ops m oprnd_list Int64_overflow.mul in
     let _, _, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
     rip_incr m;
   | Negq -> 
+    Printf.printf "OP === Negq\n";
     let res = arith_ops m oprnd_list (dummy Int64_overflow.neg) in
     let dest, _, value, overflow = res in
     let fo = overflow || (dest = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
     rip_incr m;    
   | Decq -> 
+    Printf.printf "OP === Decq\n";
     let res = arith_ops m oprnd_list (dummy Int64_overflow.pred) in
     let src, _, value, overflow = res in
     let fo = overflow || (src = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
     rip_incr m;
   | Incq -> 
+    Printf.printf "OP === Incq\n";
     let res = arith_ops m oprnd_list (dummy Int64_overflow.succ) in
     let src, dest, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
@@ -305,13 +332,13 @@ let exec_ins (inst:ins) (m:mach) : unit =
   | Retq -> () (* RET *)
   end
 
-
-
 let step (m:mach) : unit =
-  let rip = m.regs.(rind Rip) in
-  let inst = m.mem.(Int64.to_int rip) in
+  let next_ins_location = m.regs.(rind Rip) in
+  Printf.printf "next_ins_location === 0x%Lx\n" (next_ins_location);
+  let inst = get_mem m next_ins_location 0L in
+  (* let inst = sbytes_of_int64 (resolve_addr next_ins_location 0L m) in *)
   begin match inst with
-  | InsB0 i -> exec_ins i m
+  | InsB0 i -> Printf.printf "inst === %s\n" (string_of_ins i); exec_ins i m;
   | _ -> () (* TODO: do we need to anything with byte?? *)
   end
 
@@ -436,7 +463,7 @@ let patch_ins (m:map * sbyte list) (i:ins) : (map * sbyte list) =
   let _map, sbyte_l = m in 
   (* i = instruction in question *)
   (* op = the opcode, opr_l = yet to be patched operand list *)
-  Printf.printf "INSTRUCTION: %s\n" (string_of_ins i);
+  (* Printf.printf "INSTRUCTION: %s\n" (string_of_ins i); *)
   let op, opr_l = i in
   let _, patched_opr_l = List.fold_left resolve_lbl (_map, []) opr_l in
   (_map, sbyte_l @ sbytes_of_ins (op, patched_opr_l))
@@ -479,16 +506,7 @@ let resolve_symbols (p:prog) (s:int64) : (quad * sbyte list * sbyte list) =
   ((resolve_lbl_helper new_map (Lbl "main")), text_seg, data_seg)
 
 
-let rec accum_sbyte (l:sbyte list) : string =
-  begin match l with
-  | h::tl -> 
-    begin match h with 
-    | InsB0 i -> (string_of_ins i) ^ "; " ^ (accum_sbyte tl)
-    | InsFrag -> "InsFrag; " ^ (accum_sbyte tl)
-    | Byte b -> (String.make 1 b) ^ "; " ^ (accum_sbyte tl)
-    end
-  | [] -> ""
-  end
+
   
 
 
@@ -508,8 +526,8 @@ let rec accum_sbyte (l:sbyte list) : string =
 let assemble (p:prog) : exec =
   let size_text, size_data = List.fold_left compute_size (0L, 0L) p in
   let main, text_seg, data_seg = resolve_symbols p size_text in
-    Printf.printf "%s\n\n\n\n" (string_of_prog p);
-    Printf.printf "%s\n\n\n\n" (accum_sbyte text_seg);
+    (* Printf.printf "%s\n\n\n\n" (string_of_prog p);
+    Printf.printf "%s\n\n\n\n" (accum_sbyte text_seg); *)
     {entry=main; text_pos=mem_bot; 
     data_pos=Int64.add mem_bot size_text;
     text_seg=text_seg; data_seg=data_seg}
