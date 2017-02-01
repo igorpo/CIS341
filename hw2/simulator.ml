@@ -238,13 +238,26 @@ let set_val_in_loc (v:int64) (op:operand) (m:mach) : unit =
   | _ -> failwith "Not a register or mem address"
   end
 
+(* test if overflow flag is set for SHL op *)
+let shl_of (dest:int64) (amt:int) : bool =
+  let top_two_bits_diff = (Int64.shift_right_logical dest 62) = 1L 
+  || (Int64.shift_right_logical dest 62) = 2L in 
+  (amt = 1) && top_two_bits_diff
+
+(* get the shift amount needed for out bit manipulations *)
+let shift_amount (op:operand) (m:mach) : int = 
+  begin match op with
+  | Imm i -> Int64.to_int (valid_lit i)
+  | Reg Rcx -> Int64.to_int (m.regs.(rind Rcx))
+  | _ -> failwith "Shifting amount is an imm or rcx"
+  end
+
 (* dummy function to convert all arithmetic ops into one clean func *)
 let two_arg_to_3 (f) =
   let g (x) (y) = f x in g
 
 (* handle arithmetic operations *)
-let arith_ops (m:mach) (o: operand list) (f) : 
-                (int64 * int64 * int64 * bool) =
+let arith_ops (m:mach) (o: operand list) (f) : (int64 * int64 * int64 * bool) =
   let open Int64_overflow in
   begin match o with
   | s::d::[] -> 
@@ -261,11 +274,8 @@ let arith_ops (m:mach) (o: operand list) (f) :
   | _ -> failwith "Cannot have more than two operands in this list"
   end
 
-
-
 (* Logic instructions *)
-let logic_ops (m:mach) (o:operand list) (f): 
-                    (int64 * int64 * int64 * bool) =
+let logic_ops (m:mach) (o:operand list) (f): (int64 * int64 * int64 * bool) =
   begin match o with
   | s::d::[] -> 
     let src = get_val_from_loc m s in
@@ -290,6 +300,19 @@ let data_mov_ops (m:mach) (o:operand list) : unit =
   | s::[] -> ()
   | _ -> failwith "Cannot have more than two operands in this list"
   end
+
+(* bit shifting/manipulation operations *)
+let shift_ops (m:mach) (o:operand list) (f) : (int * int64 * int64) =
+  begin match o with 
+  | amt::d::[] -> 
+    let s = shift_amount amt m in 
+    let dest = get_val_from_loc m d in 
+    let result = f dest s in 
+    set_val_in_loc result d m;
+    (s, dest, result) 
+  | _ -> failwith "Cannot have more than two operands in this list"
+  end
+
 (* Update flags *)
 let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
   f.fo <- fo; f.fs <- fs; f.fz <- fz    
@@ -373,12 +396,41 @@ let exec_ins (inst:ins) (m:mach) : unit =
     Printf.printf "OP === Movq\n";
     data_mov_ops m oprnd_list;
     rip_incr m;
+  | Sarq -> 
+    Printf.printf "OP === Sarq\n";
+    let amt, dest, value = shift_ops m oprnd_list Int64.shift_right in
+    let overflow = if amt = 0 then false else m.flags.fo in
+    if amt = 0 then 
+      () 
+    else 
+      update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Shlq -> 
+    Printf.printf "OP === Shlq\n";
+    let amt, dest, value = shift_ops m oprnd_list Int64.shift_left in
+    let overflow = if shl_of dest amt then true else m.flags.fo in
+    if amt = 0 then 
+      () 
+    else 
+      update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Shrq -> 
+    Printf.printf "OP === Shrq\n";
+    let amt, dest, value = shift_ops m oprnd_list Int64.shift_right_logical in
+    let overflow = 
+      if amt = 1 then 
+        (Int64.shift_right_logical dest 63) = 1L 
+      else 
+        m.flags.fo in
+    if amt = 0 then 
+      () 
+    else 
+      update_flags m.flags overflow (sign value) (value = Int64.zero);
+    rip_incr m;
   | Pushq -> () (* SRC DEST *)
   | Popq -> () (* SRC DEST *)
   | Leaq -> () (* SRC DEST *)
-  | Shlq -> () (* AMT DEST *)
-  | Sarq -> () (* AMT DEST *)
-  | Shrq -> ()  (* AMT DEST *)
+
   | Jmp -> () (* SRC DEST *)
   | J j -> () (* CC, DEST *)
   | Cmpq -> () (* SRC1 SRC2 *) (* FLAGS *)
