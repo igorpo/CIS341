@@ -292,12 +292,21 @@ let logic_ops (m:mach) (o:operand list) (f): (int64 * int64 * int64 * bool) =
   end
 
 (* Data movement instructions *)
-let data_mov_ops (m:mach) (o:operand list) : unit = 
+let data_mov_ops (m:mach) (o:operand list) (is_push:bool) : unit = 
   begin match o with
   | s::d::[] -> 
     let src = get_val_from_loc m s in
     set_val_in_loc src d m;
-  | s::[] -> ()
+  | s::[] -> 
+    let curr_rsp = m.regs.(rind Rsp) in
+    if is_push then 
+      let src = get_val_from_loc m s in
+      m.regs.(rind Rsp) <- Int64.sub curr_rsp 8L;
+      set_val_in_loc src (Ind2 Rsp) m;
+    else 
+      let dest = get_val_from_loc m (Ind2 Rsp) in
+      m.regs.(rind Rsp) <- Int64.add curr_rsp 8L;
+      set_val_in_loc dest s m;
   | _ -> failwith "Cannot have more than two operands in this list"
   end
 
@@ -316,8 +325,6 @@ let shift_ops (m:mach) (o:operand list) (f) : (int * int64 * int64) =
 (* Update flags *)
 let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
   f.fo <- fo; f.fs <- fs; f.fz <- fz    
-
-
 
 (* Interprets instruction *)
 (*     
@@ -394,7 +401,7 @@ let exec_ins (inst:ins) (m:mach) : unit =
     rip_incr m;
   | Movq -> 
     Printf.printf "OP === Movq\n";
-    data_mov_ops m oprnd_list;
+    data_mov_ops m oprnd_list false;
     rip_incr m;
   | Sarq -> 
     Printf.printf "OP === Sarq\n";
@@ -427,10 +434,15 @@ let exec_ins (inst:ins) (m:mach) : unit =
     else 
       update_flags m.flags overflow (sign value) (value = Int64.zero);
     rip_incr m;
-  | Pushq -> () (* SRC DEST *)
-  | Popq -> () (* SRC DEST *)
+  | Pushq -> 
+    Printf.printf "OP === Pushq\n";
+    data_mov_ops m oprnd_list true;
+    rip_incr m;
+  | Popq -> 
+    Printf.printf "OP === Popq\n";
+    data_mov_ops m oprnd_list false;
+    rip_incr m;
   | Leaq -> () (* SRC DEST *)
-
   | Jmp -> () (* SRC DEST *)
   | J j -> () (* CC, DEST *)
   | Cmpq -> () (* SRC1 SRC2 *) (* FLAGS *)
