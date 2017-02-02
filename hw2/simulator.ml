@@ -345,8 +345,9 @@ let jump (m:mach) (o:operand list) : unit =
 
 (* return handler *)
 let return (m:mach) : unit = 
-  set_val_in_loc (Reg Rip) (get_val_from_loc m (Ind2 Rsp));
-  m.regs.(rind Rsp) <- Int64.add curr_rsp 8L;
+  let curr_rsp = m.regs.(rind Rsp) in 
+  set_val_in_loc (get_val_from_loc m (Ind2 Rsp)) (Reg Rip) m;
+  m.regs.(rind Rsp) <- Int64.add curr_rsp 8L
 
 (* Update flags *)
 let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
@@ -478,11 +479,13 @@ let exec_ins (inst:ins) (m:mach) : unit =
   | Jmp -> 
     Printf.printf "OP === Jmp\n";
     jump m oprnd_list;
+  | Retq -> 
+    Printf.printf "OP === Retq\n";
+    return m;
   | Leaq -> () (* SRC DEST *)
   | J j -> () (* CC, DEST *)
   | Set s -> () (* CC, DEST *)
   | Callq -> () (* SRC DEST *)
-  | Retq -> return m
   end
 
 (* Simulates one step of the machine:
