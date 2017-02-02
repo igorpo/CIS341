@@ -1443,23 +1443,23 @@ let wmcd_tests =
   ]
 
 let tests = 
-          (* asgoel_tests *)
-          (* cbarcen_tests *)
-          (* charcobb_tests *)
-                              chinz_tests (*set??*)
-          (* dmally_tests *)
-          (* ellisl_tests *)
-          (* honki_tests *)
-          (* isibner_tests *)
-          (* jampa_tests *)
-                              (* kainino_tests (*segfault*) *)
-          (* lpena_tests *)
-          (* maxmcc_tests *)
-          (* nchodosh_tests *)
-          (* palimar_tests *)
-          (* samrossi_tests *)
-          (* tgarsys_tests *)
-          (* wmcd_tests *)
+          asgoel_tests @
+          cbarcen_tests @
+          charcobb_tests @
+          chinz_tests @
+          dmally_tests @
+          ellisl_tests @
+          honki_tests @
+          isibner_tests @
+          jampa_tests @
+          kainino_tests @ 
+          lpena_tests @
+          maxmcc_tests @
+          nchodosh_tests @
+          palimar_tests @
+          samrossi_tests @
+          tgarsys_tests @
+          wmcd_tests
 
 let other_team_tests : suite = 
   [

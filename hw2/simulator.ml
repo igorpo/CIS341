@@ -164,7 +164,7 @@ let map_addr (addr:quad) : int option =
     None 
 
 let resolve_addr_loc (v:int64) (offset:int64) : int =
-  (* Printf.printf "Trying to resolve addr %Lx with offset %Ld\n" (v) (offset); *)
+  Printf.printf "Trying to resolve addr %Lx with offset %Ld\n" (v) (offset);
   begin match map_addr (Int64.add v offset) with
   | Some s -> s 
   | None -> raise X86lite_segfault
@@ -366,12 +366,14 @@ let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
 let leaq (m:mach) (o:operand list): unit =
   rip_incr m;
   begin match o with
-    |s::d::[] ->
-      begin match s with
-      | Imm _ | Reg _ -> failwith "Can only be called with Ind"
-      | _ -> let v = get_val_from_loc m s in set_val_in_loc v d m 
-      end
-    | _ -> failwith "Wrong number of operands for leaq"
+  |s::d::[] -> 
+    let v = begin match s with
+    | Imm _ | Reg _ -> failwith "Can only be called with Ind"
+    | Ind1 i -> valid_lit i
+    | Ind2 r -> m.regs.(rind r)
+    | Ind3 (i,r) -> Int64.add m.regs.(rind r) (valid_lit i)
+    end in set_val_in_loc v d m;
+  | _ -> failwith "Wrong number of operands for leaq"
   end
 
 let c_jump (m:mach) (c:cnd) (s:operand list): unit =
@@ -545,7 +547,7 @@ let exec_ins (inst:ins) (m:mach) : unit =
   | J j -> 
     (* Printf.printf "OP === J \n"; *)
     c_jump m j oprnd_list(* CC, DEST *)
-  | Set s -> () (* CC, DEST *)
+  | Set s -> setb m s oprnd_list (* CC, DEST *)
   | Callq -> 
     (* Printf.printf "OP === Callq\n"; *)
     callq m oprnd_list;
