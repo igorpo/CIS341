@@ -1,0 +1,260 @@
+
+
+
+rm -f *.native *.byte;
+ocamlbuild -clean
+ocamlbuild -libs nums,unix,str -Is util,x86 main.native
+ocamldep.opt -modules main.ml > main.ml.depends
+ocamldep.opt -modules util/assert.mli > util/assert.mli.depends
+ocamldep.opt -modules ourtest.ml > ourtest.ml.depends
+ocamlc.opt -c -I util -I x86 -o util/assert.cmi util/assert.mli
+ocamldep.opt -modules simulator.ml > simulator.ml.depends
+ocamldep.opt -modules int64_overflow.mli > int64_overflow.mli.depends
+ocamldep.opt -modules x86/x86.ml > x86/x86.ml.depends
+ocamlc.opt -c -I x86 -I util -o int64_overflow.cmi int64_overflow.mli
+ocamlc.opt -c -I x86 -I util -o x86/x86.cmo x86/x86.ml
+ocamlc.opt -c -I x86 -I util -o simulator.cmo simulator.ml
+ocamlc.opt -c -I x86 -I util -o ourtest.cmo ourtest.ml
+ocamlc.opt -c -I x86 -I util -o main.cmo main.ml
+ocamldep.opt -modules util/assert.ml > util/assert.ml.depends
+ocamlopt.opt -c -I util -I x86 -o util/assert.cmx util/assert.ml
+ocamldep.opt -modules int64_overflow.ml > int64_overflow.ml.depends
+ocamlopt.opt -c -I x86 -I util -o int64_overflow.cmx int64_overflow.ml
+ocamlopt.opt -c -I x86 -I util -o x86/x86.cmx x86/x86.ml
+ocamlopt.opt -c -I x86 -I util -o simulator.cmx simulator.ml
+ocamlopt.opt -c -I x86 -I util -o ourtest.cmx ourtest.ml
+ocamlopt.opt -c -I x86 -I util -o main.cmx main.ml
+ocamlopt.opt nums.cmxa unix.cmxa str.cmxa int64_overflow.cmx x86/x86.cmx simulator.cmx util/assert.cmx ourtest.cmx main.cmx -o main.native
+label = fac ----- list_size=0
+label = exit ----- list_size=24
+label = main ----- list_size=30
+Trying to resolve addr 400030 with offset 0
+	movq	$6, %rdi
+Trying to resolve addr 400034 with offset 0
+	callq	4194304
+Trying to resolve addr 40fff0 with offset 0
+Trying to resolve addr 400000 with offset 0
+	subq	$8, %rsp
+Trying to resolve addr 400004 with offset 0
+	cmpq	$1, %rdi
+Trying to resolve addr 400008 with offset 0
+	jle	4194340
+Trying to resolve addr 40000c with offset 0
+	movq	%rdi, (%rsp)
+Trying to resolve addr 40ffe8 with offset 0
+Trying to resolve addr 400010 with offset 0
+	decq	%rdi
+Trying to resolve addr 400014 with offset 0
+	callq	4194304
+Trying to resolve addr 40ffe0 with offset 0
+Trying to resolve addr 400000 with offset 0
+	subq	$8, %rsp
+Trying to resolve addr 400004 with offset 0
+	cmpq	$1, %rdi
+Trying to resolve addr 400008 with offset 0
+	jle	4194340
+Trying to resolve addr 40000c with offset 0
+	movq	%rdi, (%rsp)
+Trying to resolve addr 40ffd8 with offset 0
+Trying to resolve addr 400010 with offset 0
+	decq	%rdi
+Trying to resolve addr 400014 with offset 0
+	callq	4194304
+Trying to resolve addr 40ffd0 with offset 0
+Trying to resolve addr 400000 with offset 0
+	subq	$8, %rsp
+Trying to resolve addr 400004 with offset 0
+	cmpq	$1, %rdi
+Trying to resolve addr 400008 with offset 0
+	jle	4194340
+Trying to resolve addr 40000c with offset 0
+	movq	%rdi, (%rsp)
+Trying to resolve addr 40ffc8 with offset 0
+Trying to resolve addr 400010 with offset 0
+	decq	%rdi
+Trying to resolve addr 400014 with offset 0
+	callq	4194304
+Trying to resolve addr 40ffc0 with offset 0
+Trying to resolve addr 400000 with offset 0
+	subq	$8, %rsp
+Trying to resolve addr 400004 with offset 0
+	cmpq	$1, %rdi
+Trying to resolve addr 400008 with offset 0
+	jle	4194340
+Trying to resolve addr 40000c with offset 0
+	movq	%rdi, (%rsp)
+Trying to resolve addr 40ffb8 with offset 0
+Trying to resolve addr 400010 with offset 0
+	decq	%rdi
+Trying to resolve addr 400014 with offset 0
+	callq	4194304
+Trying to resolve addr 40ffb0 with offset 0
+Trying to resolve addr 400000 with offset 0
+	subq	$8, %rsp
+Trying to resolve addr 400004 with offset 0
+	cmpq	$1, %rdi
+Trying to resolve addr 400008 with offset 0
+	jle	4194340
+Trying to resolve addr 40000c with offset 0
+	movq	%rdi, (%rsp)
+Trying to resolve addr 40ffa8 with offset 0
+Trying to resolve addr 400010 with offset 0
+	decq	%rdi
+Trying to resolve addr 400014 with offset 0
+	callq	4194304
+Trying to resolve addr 40ffa0 with offset 0
+Trying to resolve addr 400000 with offset 0
+	subq	$8, %rsp
+Trying to resolve addr 400004 with offset 0
+	cmpq	$1, %rdi
+Trying to resolve addr 400008 with offset 0
+	jle	4194340
+Trying to resolve addr 400024 with offset 0
+	movq	$1, %rax
+Trying to resolve addr 400028 with offset 0
+	addq	$8, %rsp
+****   Addq got result  ****
+Trying to resolve addr 40002c with offset 0
+	retq	
+Trying to resolve addr 40ffa0 with offset 7
+Trying to resolve addr 40ffa0 with offset 6
+Trying to resolve addr 40ffa0 with offset 5
+Trying to resolve addr 40ffa0 with offset 4
+Trying to resolve addr 40ffa0 with offset 3
+Trying to resolve addr 40ffa0 with offset 2
+Trying to resolve addr 40ffa0 with offset 1
+Trying to resolve addr 40ffa0 with offset 0
+Trying to resolve addr 400018 with offset 0
+	imulq	(%rsp), %rax
+Trying to resolve addr 40ffa8 with offset 7
+Trying to resolve addr 40ffa8 with offset 6
+Trying to resolve addr 40ffa8 with offset 5
+Trying to resolve addr 40ffa8 with offset 4
+Trying to resolve addr 40ffa8 with offset 3
+Trying to resolve addr 40ffa8 with offset 2
+Trying to resolve addr 40ffa8 with offset 1
+Trying to resolve addr 40ffa8 with offset 0
+Trying to resolve addr 40001c with offset 0
+	addq	$8, %rsp
+****   Addq got result  ****
+Trying to resolve addr 400020 with offset 0
+	retq	
+Trying to resolve addr 40ffb0 with offset 7
+Trying to resolve addr 40ffb0 with offset 6
+Trying to resolve addr 40ffb0 with offset 5
+Trying to resolve addr 40ffb0 with offset 4
+Trying to resolve addr 40ffb0 with offset 3
+Trying to resolve addr 40ffb0 with offset 2
+Trying to resolve addr 40ffb0 with offset 1
+Trying to resolve addr 40ffb0 with offset 0
+Trying to resolve addr 400018 with offset 0
+	imulq	(%rsp), %rax
+Trying to resolve addr 40ffb8 with offset 7
+Trying to resolve addr 40ffb8 with offset 6
+Trying to resolve addr 40ffb8 with offset 5
+Trying to resolve addr 40ffb8 with offset 4
+Trying to resolve addr 40ffb8 with offset 3
+Trying to resolve addr 40ffb8 with offset 2
+Trying to resolve addr 40ffb8 with offset 1
+Trying to resolve addr 40ffb8 with offset 0
+Trying to resolve addr 40001c with offset 0
+	addq	$8, %rsp
+****   Addq got result  ****
+Trying to resolve addr 400020 with offset 0
+	retq	
+Trying to resolve addr 40ffc0 with offset 7
+Trying to resolve addr 40ffc0 with offset 6
+Trying to resolve addr 40ffc0 with offset 5
+Trying to resolve addr 40ffc0 with offset 4
+Trying to resolve addr 40ffc0 with offset 3
+Trying to resolve addr 40ffc0 with offset 2
+Trying to resolve addr 40ffc0 with offset 1
+Trying to resolve addr 40ffc0 with offset 0
+Trying to resolve addr 400018 with offset 0
+	imulq	(%rsp), %rax
+Trying to resolve addr 40ffc8 with offset 7
+Trying to resolve addr 40ffc8 with offset 6
+Trying to resolve addr 40ffc8 with offset 5
+Trying to resolve addr 40ffc8 with offset 4
+Trying to resolve addr 40ffc8 with offset 3
+Trying to resolve addr 40ffc8 with offset 2
+Trying to resolve addr 40ffc8 with offset 1
+Trying to resolve addr 40ffc8 with offset 0
+Trying to resolve addr 40001c with offset 0
+	addq	$8, %rsp
+****   Addq got result  ****
+Trying to resolve addr 400020 with offset 0
+	retq	
+Trying to resolve addr 40ffd0 with offset 7
+Trying to resolve addr 40ffd0 with offset 6
+Trying to resolve addr 40ffd0 with offset 5
+Trying to resolve addr 40ffd0 with offset 4
+Trying to resolve addr 40ffd0 with offset 3
+Trying to resolve addr 40ffd0 with offset 2
+Trying to resolve addr 40ffd0 with offset 1
+Trying to resolve addr 40ffd0 with offset 0
+Trying to resolve addr 400018 with offset 0
+	imulq	(%rsp), %rax
+Trying to resolve addr 40ffd8 with offset 7
+Trying to resolve addr 40ffd8 with offset 6
+Trying to resolve addr 40ffd8 with offset 5
+Trying to resolve addr 40ffd8 with offset 4
+Trying to resolve addr 40ffd8 with offset 3
+Trying to resolve addr 40ffd8 with offset 2
+Trying to resolve addr 40ffd8 with offset 1
+Trying to resolve addr 40ffd8 with offset 0
+Trying to resolve addr 40001c with offset 0
+	addq	$8, %rsp
+****   Addq got result  ****
+Trying to resolve addr 400020 with offset 0
+	retq	
+Trying to resolve addr 40ffe0 with offset 7
+Trying to resolve addr 40ffe0 with offset 6
+Trying to resolve addr 40ffe0 with offset 5
+Trying to resolve addr 40ffe0 with offset 4
+Trying to resolve addr 40ffe0 with offset 3
+Trying to resolve addr 40ffe0 with offset 2
+Trying to resolve addr 40ffe0 with offset 1
+Trying to resolve addr 40ffe0 with offset 0
+Trying to resolve addr 400018 with offset 0
+	imulq	(%rsp), %rax
+Trying to resolve addr 40ffe8 with offset 7
+Trying to resolve addr 40ffe8 with offset 6
+Trying to resolve addr 40ffe8 with offset 5
+Trying to resolve addr 40ffe8 with offset 4
+Trying to resolve addr 40ffe8 with offset 3
+Trying to resolve addr 40ffe8 with offset 2
+Trying to resolve addr 40ffe8 with offset 1
+Trying to resolve addr 40ffe8 with offset 0
+Trying to resolve addr 40001c with offset 0
+	addq	$8, %rsp
+****   Addq got result  ****
+Trying to resolve addr 400020 with offset 0
+	retq	
+Trying to resolve addr 40fff0 with offset 7
+Trying to resolve addr 40fff0 with offset 6
+Trying to resolve addr 40fff0 with offset 5
+Trying to resolve addr 40fff0 with offset 4
+Trying to resolve addr 40fff0 with offset 3
+Trying to resolve addr 40fff0 with offset 2
+Trying to resolve addr 40fff0 with offset 1
+Trying to resolve addr 40fff0 with offset 0
+Trying to resolve addr 400038 with offset 0
+	retq	
+Trying to resolve addr 40fff8 with offset 7
+Trying to resolve addr 40fff8 with offset 6
+Trying to resolve addr 40fff8 with offset 5
+Trying to resolve addr 40fff8 with offset 4
+Trying to resolve addr 40fff8 with offset 3
+Trying to resolve addr 40fff8 with offset 2
+Trying to resolve addr 40fff8 with offset 1
+Trying to resolve addr 40fff8 with offset 0
+Trying to resolve addr fdeb1 with offset 0
+
+Factorial (0/10 points)
+  fact6: failed - test threw exception: Simulator.X86lite_segfault
+---------------------------------------------------
+Passed: 0/1
+Failed: 1/1
+Score: 0/10 (given)
+       ?/0 (hidden)
