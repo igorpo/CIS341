@@ -374,10 +374,16 @@ let c_jump (m:mach) (c:cnd) (s:operand list): unit =
 let set : unit =
   ()
 
-let callq : unit =
-  ()
-
-
+let callq (m:mach) (o:operand list) : unit =
+  begin match o with 
+  | s::[] -> 
+    let curr_rsp = m.regs.(rind Rsp) in
+    let src = get_val_from_loc m s in
+    m.regs.(rind Rsp) <- Int64.sub curr_rsp 8L;
+    set_val_in_loc  (get_val_from_loc m (Ind2 Rsp)) (Reg Rip) m;
+    m.regs.(rind Rip) <- src
+  | _ -> failwith "Cannot have more than one operand"
+  end
 
 (* Interprets instruction *)
 (*     
@@ -514,7 +520,9 @@ let exec_ins (inst:ins) (m:mach) : unit =
     rip_incr m;
   | J j -> c_jump m j oprnd_list(* CC, DEST *)
   | Set s -> () (* CC, DEST *)
-  | Callq -> () (* SRC DEST *)
+  | Callq -> 
+    Printf.printf "OP === Callq\n";
+    callq m oprnd_list;
   end
 
 (* Simulates one step of the machine:
