@@ -605,18 +605,36 @@ let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
   (* fold on map, t with patch_ins*)
   | Text t -> 
     let label = e.lbl in 
+    Printf.printf "label = %s" (label);
     let new_map = 
       if not (map_contains _map label) then 
         let list_size = Int64.of_int (List.length text_seg) in
+        (* Printf.printf "label = %s" (label); *)
         _map @ [(label, (Int64.mul 4L list_size))]
       else
         raise (Redefined_sym label) in
-    let _, patched_ins = List.fold_left patch_ins (new_map, text_seg) t in
-    (new_map, patched_ins)
+    let new_new_map, patched_ins = List.fold_left patch_ins (new_map, text_seg) t in
+    (new_new_map, patched_ins)
   | _ -> m
   end
 
-
+let handle_text_seg_labels (m:map * sbyte list) (e:elem) : (map * sbyte list) =
+  let _map, text_seg = m in
+  begin match e.asm with
+  (* fold on map, t with patch_ins*)
+  | Text t -> 
+    let label = e.lbl in 
+    Printf.printf "label = %s" (label);
+    let new_map = 
+      if not (map_contains _map label) then 
+        let list_size = Int64.of_int (List.length text_seg) in
+        (* Printf.printf "label = %s" (label); *)
+        _map @ [(label, (Int64.mul 4L list_size))]
+      else
+        raise (Redefined_sym label)
+    (new_new_map, patched_ins)
+  | _ -> m
+  end
 
 (* first generates map and data segment *)
 (* then folds on the program to generate text segment *)
