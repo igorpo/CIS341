@@ -354,6 +354,21 @@ let return (m:mach) : unit =
 let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
   f.fo <- fo; f.fs <- fs; f.fz <- fz    
 
+
+let leaq : unit =
+  ()
+
+let c_jump : unit =
+  ()
+
+let set : unit =
+  ()
+
+let callq : unit =
+  ()
+
+
+
 (* Interprets instruction *)
 (*     
     - perform instruction
