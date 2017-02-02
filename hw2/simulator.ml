@@ -365,8 +365,11 @@ let leaq (m:mach) (o:operand list): unit =
     | _ -> failwith "Wrong number of operands for leaq"
   end
 
-let c_jump : unit =
-  ()
+let c_jump (m:mach) (c:cnd) (s:operand list): unit =
+  if interp_cnd m.flags c then
+    jump m s
+  else
+    rip_incr m
 
 let set : unit =
   ()
@@ -509,7 +512,7 @@ let exec_ins (inst:ins) (m:mach) : unit =
   | Leaq -> 
     leaq m oprnd_list;
     rip_incr m;
-  | J j -> () (* CC, DEST *)
+  | J j -> c_jump m j oprnd_list(* CC, DEST *)
   | Set s -> () (* CC, DEST *)
   | Callq -> () (* SRC DEST *)
   end
