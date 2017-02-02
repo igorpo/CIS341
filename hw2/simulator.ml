@@ -164,7 +164,7 @@ let map_addr (addr:quad) : int option =
     None 
 
 let resolve_addr_loc (v:int64) (offset:int64) : int =
-  Printf.printf "Trying to resolve addr %Lx with offset %Ld\n" (v) (offset);
+  (* Printf.printf "Trying to resolve addr %Lx with offset %Ld\n" (v) (offset); *)
   begin match map_addr (Int64.add v offset) with
   | Some s -> s 
   | None -> raise X86lite_segfault
