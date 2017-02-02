@@ -355,6 +355,25 @@ let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
   f.fo <- fo; f.fs <- fs; f.fz <- fz    
 
 
+let leaq (m:mach) (o:operand list): unit =
+  begin match o with
+    |s::d::[] ->
+      begin match s with
+      | Imm _ | Reg _ -> failwith "Can only be called with Ind"
+      | _ -> let v = get_val_from_loc m s in set_val_in_loc v d m 
+      end
+    | _ -> failwith "Wrong number of operands for leaq"
+  end
+
+let c_jump (m:mach) (c:cnd) (s:operand list): unit =
+  if interp_cnd m.flags c then
+    jump m s
+  else
+    rip_incr m
+
+let set : unit =
+  ()
+
 let callq (m:mach) (o:operand list) : unit =
   begin match o with 
   | s::[] -> 
@@ -496,8 +515,10 @@ let exec_ins (inst:ins) (m:mach) : unit =
     Printf.printf "OP === Retq\n";
     return m;
     rip_incr m;
-  | Leaq -> () (* SRC DEST *)
-  | J j -> () (* CC, DEST *)
+  | Leaq -> 
+    leaq m oprnd_list;
+    rip_incr m;
+  | J j -> c_jump m j oprnd_list(* CC, DEST *)
   | Set s -> () (* CC, DEST *)
   | Callq -> 
     Printf.printf "OP === Callq\n";
@@ -627,7 +648,6 @@ let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
   begin match e.asm with
   (* fold on map, t with patch_ins*)
   | Text t -> 
-    let label = e.lbl in 
     let new_new_map, patched_ins = List.fold_left patch_ins (_map, text_seg) t in
     (new_new_map, patched_ins)
   | _ -> m
