@@ -163,6 +163,7 @@ let map_addr (addr:quad) : int option =
     None 
 
 let resolve_addr_loc (v:int64) (offset:int64) : int =
+  Printf.printf "Trying to resolve addr %Ld with offset %Ld" (v) (offset);
   begin match map_addr (Int64.add v offset) with
   | Some s -> s 
   | None -> raise X86lite_segfault
@@ -537,36 +538,6 @@ let rec map_lookup (m:map) (k:lbl) : quad =
   end
 
 
-let data_helper (l:sbyte list) (d:data): sbyte list =
-  l @ (sbytes_of_data d)
-
-(* 
-  takes in symbol_map dictionary, sbyte list
-  match asm on data
-  update map, sbyte list
-  
-  return map, sbyte list
-*)
-let handle_data (t:int64 * map * sbyte list) 
-                (e:elem) : (int64 * map * sbyte list) = 
-  begin match e.asm with
-    | Data d -> 
-      let size_text, _map, data_seg = t in
-      let label = e.lbl in
-      let new_map = 
-        if not (map_contains _map label) then 
-        (* update map *)
-          let list_size = Int64.of_int (List.length data_seg) in
-          _map @ [(label, (Int64.add size_text list_size))]
-        else
-          raise (Redefined_sym label) in
-      let new_data_seg = List.fold_left data_helper data_seg d in
-      (size_text, new_map, new_data_seg)
-    | _ -> t
-  end
-
-  
-
 let resolve_lbl_helper (m:map) (i:imm) : quad =
   begin match i with
   | Lit l -> l 
@@ -605,44 +576,64 @@ let handle_text (m:map * sbyte list) (e:elem) : (map * sbyte list) =
   (* fold on map, t with patch_ins*)
   | Text t -> 
     let label = e.lbl in 
-    Printf.printf "label = %s" (label);
-    let new_map = 
-      if not (map_contains _map label) then 
-        let list_size = Int64.of_int (List.length text_seg) in
-        (* Printf.printf "label = %s" (label); *)
-        _map @ [(label, (Int64.mul 4L list_size))]
-      else
-        raise (Redefined_sym label) in
-    let new_new_map, patched_ins = List.fold_left patch_ins (new_map, text_seg) t in
+    let new_new_map, patched_ins = List.fold_left patch_ins (_map, text_seg) t in
     (new_new_map, patched_ins)
   | _ -> m
   end
 
-let handle_text_seg_labels (m:map * sbyte list) (e:elem) : (map * sbyte list) =
-  let _map, text_seg = m in
+
+
+let handle_text_seg_labels (m:map * int64) (e:elem) : (map * int64) =
+  let _map, list_size = m in
   begin match e.asm with
   (* fold on map, t with patch_ins*)
   | Text t -> 
     let label = e.lbl in 
-    Printf.printf "label = %s" (label);
+    Printf.printf "label = %s ----- list_size=%Lx\n" (label) (list_size);
     let new_map = 
       if not (map_contains _map label) then 
-        let list_size = Int64.of_int (List.length text_seg) in
-        (* Printf.printf "label = %s" (label); *)
-        _map @ [(label, (Int64.mul 4L list_size))]
+        _map @ [(label, list_size)]
       else
-        raise (Redefined_sym label)
-    (new_new_map, patched_ins)
+        raise (Redefined_sym label) in
+    (new_map, Int64.add list_size (Int64.mul (Int64.of_int (List.length t)) 4L))
   | _ -> m
   end
 
+let data_helper (l:sbyte list) (d:data): sbyte list =
+  l @ (sbytes_of_data d)
+
+(* 
+  takes in symbol_map dictionary, sbyte list
+  match asm on data
+  update map, sbyte list
+  
+  return map, sbyte list
+*)
+let handle_data (t:int64 * map * sbyte list) 
+                (e:elem) : (int64 * map * sbyte list) = 
+  begin match e.asm with
+    | Data d -> 
+      let size_text, _map, data_seg = t in
+      let label = e.lbl in
+      let new_map = 
+        if not (map_contains _map label) then 
+        (* update map *)
+          let list_size = Int64.of_int (List.length data_seg) in
+          _map @ [(label, (Int64.add size_text list_size))]
+        else
+          raise (Redefined_sym label) in
+      let new_data_seg = List.fold_left data_helper data_seg d in
+      (size_text, new_map, new_data_seg)
+    | _ -> t
+  end
 (* first generates map and data segment *)
 (* then folds on the program to generate text segment *)
 (* return text_seg, data_seg *)
 let resolve_symbols (p:prog) (s:int64) : (quad * sbyte list * sbyte list) =
   let size_text = s in
   let _, _map, data_seg = List.fold_left handle_data (size_text, [], []) p in
-  let new_map, text_seg = List.fold_left handle_text (_map, []) p in
+  let new_map, t = List.fold_left handle_text_seg_labels (_map, 0L) p in
+  let _, text_seg = List.fold_left handle_text (new_map, []) p in
   ((resolve_lbl_helper new_map (Lbl "main")), text_seg, data_seg)
 
 
