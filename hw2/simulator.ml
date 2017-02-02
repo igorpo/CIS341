@@ -323,6 +323,33 @@ let shift_ops (m:mach) (o:operand list) (f) : (int * int64 * int64) =
   | _ -> failwith "Cannot have more than two operands in this list"
   end
 
+(* handle comparisons *)
+let compare (m:mach) (o:operand list) : (int64 * int64 * int64 * bool) = 
+  let open Int64_overflow in
+  begin match o with
+  | s::d::[] -> 
+    let src = get_val_from_loc m s in
+    let dest = get_val_from_loc m d in
+    let res = Int64_overflow.sub dest src in 
+    (src, dest, res.value, res.overflow)
+  | _ -> failwith "Must have exactly two operands in the list"
+  end
+
+(* jump instruction handler *)
+let jump (m:mach) (o:operand list) : unit =
+  begin match o with 
+  | s::[] -> 
+    let src = get_val_from_loc m s in 
+    m.regs.(rind Rip) <- src;
+  | _ -> failwith "Cannot have more than one operand in the list"
+  end
+
+(* return handler *)
+let return (m:mach) : unit = 
+  let curr_rsp = m.regs.(rind Rsp) in 
+  set_val_in_loc (get_val_from_loc m (Ind2 Rsp)) (Reg Rip) m;
+  m.regs.(rind Rsp) <- Int64.add curr_rsp 8L
+
 (* Update flags *)
 let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
   f.fo <- fo; f.fs <- fs; f.fz <- fz    
@@ -443,13 +470,23 @@ let exec_ins (inst:ins) (m:mach) : unit =
     Printf.printf "OP === Popq\n";
     data_mov_ops m oprnd_list false;
     rip_incr m;
+  | Cmpq -> 
+    Printf.printf "OP === Cmpq\n";
+    let res = compare m oprnd_list in
+    let src, _, value, overflow = res in
+    let fo = overflow || (src = Int64.min_int) in
+    update_flags m.flags fo (sign value) (value = Int64.zero);
+    rip_incr m;
+  | Jmp -> 
+    Printf.printf "OP === Jmp\n";
+    jump m oprnd_list;
+  | Retq -> 
+    Printf.printf "OP === Retq\n";
+    return m;
   | Leaq -> () (* SRC DEST *)
-  | Jmp -> () (* SRC DEST *)
   | J j -> () (* CC, DEST *)
-  | Cmpq -> () (* SRC1 SRC2 *) (* FLAGS *)
   | Set s -> () (* CC, DEST *)
   | Callq -> () (* SRC DEST *)
-  | Retq -> () (* RET *)
   end
 
 (* Simulates one step of the machine:
@@ -635,11 +672,6 @@ let resolve_symbols (p:prog) (s:int64) : (quad * sbyte list * sbyte list) =
   let new_map, t = List.fold_left handle_text_seg_labels (_map, 0L) p in
   let _, text_seg = List.fold_left handle_text (new_map, []) p in
   ((resolve_lbl_helper new_map (Lbl "main")), text_seg, data_seg)
-
-
-
-  
-
 
 (* Convert an X86 program into an object file:
    - separate the text and data segments
