@@ -164,7 +164,7 @@ let map_addr (addr:quad) : int option =
     None 
 
 let resolve_addr_loc (v:int64) (offset:int64) : int =
-  Printf.printf "Trying to resolve addr %Lx with offset %Ld\n" (v) (offset);
+  (* Printf.printf "Trying to resolve addr %Lx with offset %Ld\n" (v) (offset); *)
   begin match map_addr (Int64.add v offset) with
   | Some s -> s 
   | None -> raise X86lite_segfault
@@ -380,8 +380,21 @@ let c_jump (m:mach) (c:cnd) (s:operand list): unit =
   else
     rip_incr m
 
-let set : unit =
-  ()
+let setb (m:mach) (c:cnd) (o:operand list) : unit =
+  rip_incr m;
+  begin match o with
+  | src::[] -> 
+    let v = get_val_from_loc m src in
+    let cleared = Int64.logand v (-16L) (* lower byte = 0 *) in
+    let new_val = if interp_cnd m.flags c then
+      Int64.logor cleared 1L
+    else
+      cleared
+    in
+    set_val_in_loc new_val src m
+  | _ -> failwith "Too many operands for setb"
+  end
+
 
 let callq (m:mach) (o:operand list) : unit =
   begin match o with 
@@ -547,7 +560,7 @@ let exec_ins (inst:ins) (m:mach) : unit =
 *)
 let step (m:mach) : unit =
   let next_ins_location = m.regs.(rind Rip) in
-  Printf.printf "next_ins_location === 0x%Lx\n" (next_ins_location);
+  (* Printf.printf "next_ins_location === 0x%Lx\n" (next_ins_location); *)
   let inst = get_mem_one_byte m next_ins_location 0L in
   begin match inst with
   | InsB0 i -> Printf.printf "%s\n" (string_of_ins i); exec_ins i m;
