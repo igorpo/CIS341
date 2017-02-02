@@ -322,6 +322,7 @@ let shift_ops (m:mach) (o:operand list) (f) : (int * int64 * int64) =
   | _ -> failwith "Cannot have more than two operands in this list"
   end
 
+(* handle comparisons *)
 let compare (m:mach) (o:operand list) : (int64 * int64 * int64 * bool) = 
   let open Int64_overflow in
   begin match o with
@@ -331,6 +332,15 @@ let compare (m:mach) (o:operand list) : (int64 * int64 * int64 * bool) =
     let res = Int64_overflow.sub dest src in 
     (src, dest, res.value, res.overflow)
   | _ -> failwith "Must have exactly two operands in the list"
+  end
+
+(* jump instruction handler *)
+let jump (m:mach) (o:operand list) : unit =
+  begin match o with 
+  | s::[] -> 
+    let src = get_val_from_loc m s in 
+    m.regs.(rind Rip) <- src;
+  | _ -> failwith "Cannot have more than one operand in the list"
   end
 
 (* Update flags *)
@@ -459,8 +469,9 @@ let exec_ins (inst:ins) (m:mach) : unit =
     let fo = overflow || (src = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
     rip_incr m;
+  | Jmp -> 
+    jump m oprnd_list;
   | Leaq -> () (* SRC DEST *)
-  | Jmp -> () (* SRC DEST *)
   | J j -> () (* CC, DEST *)
   | Set s -> () (* CC, DEST *)
   | Callq -> () (* SRC DEST *)
