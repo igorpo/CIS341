@@ -343,6 +343,11 @@ let jump (m:mach) (o:operand list) : unit =
   | _ -> failwith "Cannot have more than one operand in the list"
   end
 
+(* return handler *)
+let return (m:mach) : unit = 
+  set_val_in_loc (Reg Rip) (get_val_from_loc m (Ind2 Rsp));
+  m.regs.(rind Rsp) <- Int64.add curr_rsp 8L;
+
 (* Update flags *)
 let update_flags (f:flags) (fo:bool) (fs:bool) (fz:bool) : unit =
   f.fo <- fo; f.fs <- fs; f.fz <- fz    
@@ -464,18 +469,20 @@ let exec_ins (inst:ins) (m:mach) : unit =
     data_mov_ops m oprnd_list false;
     rip_incr m;
   | Cmpq -> 
+    Printf.printf "OP === Cmpq\n";
     let res = compare m oprnd_list in
     let src, _, value, overflow = res in
     let fo = overflow || (src = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
     rip_incr m;
   | Jmp -> 
+    Printf.printf "OP === Jmp\n";
     jump m oprnd_list;
   | Leaq -> () (* SRC DEST *)
   | J j -> () (* CC, DEST *)
   | Set s -> () (* CC, DEST *)
   | Callq -> () (* SRC DEST *)
-  | Retq -> () (* RET *)
+  | Retq -> return m
   end
 
 (* Simulates one step of the machine:
