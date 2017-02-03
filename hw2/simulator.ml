@@ -460,9 +460,8 @@ let exec_ins (inst:ins) (m:mach) : unit =
     let src, dest, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
   | Notq -> 
-    let res = logic_ops m oprnd_list (two_arg_to_3 Int64.lognot) in
-    let src, dest, value, overflow = res in
-    update_flags m.flags overflow (sign value) (value = Int64.zero);
+    let _ = logic_ops m oprnd_list (two_arg_to_3 Int64.lognot) in
+    update_flags m.flags m.flags.fo m.flags.fs m.flags.fz;
   | Movq -> 
     data_mov_ops m oprnd_list false;
     rip_incr m;
