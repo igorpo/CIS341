@@ -384,9 +384,10 @@ let setb (m:mach) (c:cnd) (o:operand list) : unit =
   begin match o with
   | src::[] -> 
     let v = get_val_from_loc m src in
-    let cleared = Int64.logand v (-16L) (* lower byte = 0 *) in
+    (* lower byte = 0 *)
+    let cleared = Int64.logand v (Int64.shift_left Int64.minus_one 8) in
     let new_val = if interp_cnd m.flags c then
-      Int64.logor cleared 1L
+      Int64.logor cleared Int64.one
     else
       cleared
     in
