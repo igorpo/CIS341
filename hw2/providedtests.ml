@@ -22,7 +22,7 @@ let reverse a =
           ; Retq,  []
           ]
       ; text "reverse"
-          [ Cmpq,  [~%R09; ~$0] 
+          [ Cmpq,  [~%R08; ~$0] 
           ; J Eq,  [~$$"return"]
           ; Callq, [~$$"divide_by_10"] 
           ; Callq, [~$$"mod_10"] 
