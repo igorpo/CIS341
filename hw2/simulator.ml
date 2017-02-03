@@ -135,7 +135,6 @@ let debug_simulator = ref false
 (* rip increment *)
 let rip_incr (m:mach) : unit =
   let prev_rip = m.regs.(rind Rip) in
-  (* Printf.printf "\t\trip ==== 0x%Lx\n" (prev_rip);  *)
   m.regs.(rind Rip) <- Int64.add prev_rip ins_size
 
 let sign (r:int64) : bool =
@@ -157,14 +156,12 @@ let interp_cnd {fo; fs; fz} : cnd -> bool = fun x ->
    or None if the address is not within the legal address space. *)
 let map_addr (addr:quad) : int option =
   let addr_check = addr >= mem_bot && addr < mem_top in
-  (* Printf.printf "result %b with addr %Ld\n" (addr_check) (addr); *)
   if addr_check then
     Some (Int64.to_int (Int64.sub addr mem_bot))
   else
     None 
 
 let resolve_addr_loc (v:int64) (offset:int64) : int =
-  (* Printf.printf "Trying to resolve addr %Lx with offset %Ld\n" (v) (offset); *)
   begin match map_addr (Int64.add v offset) with
   | Some s -> s 
   | None -> raise X86lite_segfault
@@ -424,75 +421,52 @@ let exec_ins (inst:ins) (m:mach) : unit =
   let op_code, oprnd_list = inst in 
   begin match op_code with
   | Addq ->
-    (* Printf.printf "OP === Addq\n"; *)
     let res = arith_ops m oprnd_list Int64_overflow.add in
-    Printf.printf "****   Addq got result  ****\n";
     let dest, _, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
-    
   | Subq ->
-    (* Printf.printf "OP === Subq\n"; *)
     let res = arith_ops m oprnd_list Int64_overflow.sub in
     let src, _, value, overflow = res in
     let fo = overflow || (src = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
-    
   | Imulq ->
-    (* Printf.printf "OP ===  Imulq\n"; *)
     let res = arith_ops m oprnd_list Int64_overflow.mul in
     let _, _, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
-    
   | Negq -> 
-    (* Printf.printf "OP === Negq\n"; *)
     let res = arith_ops m oprnd_list (two_arg_to_3 Int64_overflow.neg) in
     let dest, _, value, overflow = res in
     let fo = overflow || (dest = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
-        
   | Decq -> 
-    (* Printf.printf "OP === Decq\n"; *)
     let res = arith_ops m oprnd_list (two_arg_to_3 Int64_overflow.pred) in
     let src, _, value, overflow = res in
     let fo = overflow || (src = Int64.min_int) in
     update_flags m.flags fo (sign value) (value = Int64.zero);
-    
   | Incq -> 
-    (* Printf.printf "OP === Incq\n"; *)
     let res = arith_ops m oprnd_list (two_arg_to_3 Int64_overflow.succ) in
     let src, dest, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
-    
   | Andq -> 
-    (* Printf.printf "OP === Andq\n"; *)
     let res = logic_ops m oprnd_list Int64.logand in
     let src, dest, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
-    
   | Xorq -> 
-    (* Printf.printf "OP === Xorq\n"; *)
     let res = logic_ops m oprnd_list Int64.logxor in
     let src, dest, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
-    
   | Orq -> 
-    (* Printf.printf "OP === Orq\n"; *)
     let res = logic_ops m oprnd_list Int64.logor in
     let src, dest, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
-    
   | Notq -> 
-    (* Printf.printf "OP === Notq\n"; *)
     let res = logic_ops m oprnd_list (two_arg_to_3 Int64.lognot) in
     let src, dest, value, overflow = res in
     update_flags m.flags overflow (sign value) (value = Int64.zero);
-    
   | Movq -> 
-    (* Printf.printf "OP === Movq\n"; *)
     data_mov_ops m oprnd_list false;
     rip_incr m;
   | Sarq -> 
-    (* Printf.printf "OP === Sarq\n"; *)
     let amt, dest, value = shift_ops m oprnd_list Int64.shift_right in
     let overflow = if amt = 0 then false else m.flags.fo in
     if amt = 0 then 
@@ -500,7 +474,6 @@ let exec_ins (inst:ins) (m:mach) : unit =
     else 
       update_flags m.flags overflow (sign value) (value = Int64.zero);
   | Shlq -> 
-    (* Printf.printf "OP === Shlq\n"; *)
     let amt, dest, value = shift_ops m oprnd_list Int64.shift_left in
     let overflow = if shl_of dest amt then true else m.flags.fo in
     if amt = 0 then 
@@ -508,7 +481,6 @@ let exec_ins (inst:ins) (m:mach) : unit =
     else 
       update_flags m.flags overflow (sign value) (value = Int64.zero);
   | Shrq -> 
-    (* Printf.printf "OP === Shrq\n"; *)
     let amt, dest, value = shift_ops m oprnd_list Int64.shift_right_logical in
     let overflow = 
       if amt = 1 then 
@@ -520,36 +492,26 @@ let exec_ins (inst:ins) (m:mach) : unit =
     else 
       update_flags m.flags overflow (sign value) (value = Int64.zero);
   | Pushq -> 
-    (* Printf.printf "OP === Pushq\n"; *)
     data_mov_ops m oprnd_list true;
     rip_incr m;
   | Popq -> 
-    (* Printf.printf "OP === Popq\n"; *)
     data_mov_ops m oprnd_list false;
     rip_incr m;
   | Cmpq -> 
-    (* Printf.printf "OP === Cmpq\n"; *)
     let res = compare m oprnd_list in
     let src, _, value, overflow = res in
     let fo = overflow || (src = Int64.min_int) in
-    update_flags m.flags fo (sign value) (value = Int64.zero);
-    
+    update_flags m.flags fo (sign value) (value = Int64.zero);  
   | Jmp -> 
-    (* Printf.printf "OP === Jmp\n"; *)
     jump m oprnd_list;
   | Retq -> 
-    (* Printf.printf "OP === Retq\n"; *)
     return m;
-    (* rip_incr m; *)
   | Leaq ->
-    (* Printf.printf "OP === Leaq\n"; *)
     leaq m oprnd_list;
   | J j -> 
-    (* Printf.printf "OP === J \n"; *)
-    c_jump m j oprnd_list(* CC, DEST *)
-  | Set s -> setb m s oprnd_list (* CC, DEST *)
+    c_jump m j oprnd_list
+  | Set s -> setb m s oprnd_list
   | Callq -> 
-    (* Printf.printf "OP === Callq\n"; *)
     callq m oprnd_list;
   end
 
@@ -562,10 +524,9 @@ let exec_ins (inst:ins) (m:mach) : unit =
 *)
 let step (m:mach) : unit =
   let next_ins_location = m.regs.(rind Rip) in
-  (* Printf.printf "next_ins_location === 0x%Lx\n" (next_ins_location); *)
   let inst = get_mem_one_byte m next_ins_location 0L in
   begin match inst with
-  | InsB0 i -> Printf.printf "%s\n" (string_of_ins i); exec_ins i m;
+  | InsB0 i -> exec_ins i m;
   | _ -> ()
   end
 
@@ -689,7 +650,6 @@ let handle_text_seg_labels (m:map * int64) (e:elem) : (map * int64) =
   (* fold on map, t with patch_ins*)
   | Text t -> 
     let label = e.lbl in 
-    Printf.printf "label = %s ----- list_size=%Lx\n" (label) (list_size);
     let new_map = 
       if not (map_contains _map label) then 
         _map @ [(label, list_size)]

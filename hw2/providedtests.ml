@@ -22,7 +22,7 @@ let reverse a =
           ; Retq,  []
           ]
       ; text "reverse"
-          [ Cmpq,  [~%R08; ~$0] 
+          [ Cmpq,  [~$0; ~%R08] 
           ; J Eq,  [~$$"return"]
           ; Movq,  [~$0; ~%R11] (* R11 is counter *)
           ; Movq,  [~%R08; ~%R12]
@@ -35,14 +35,14 @@ let reverse a =
           ; Jmp,   [~$$"reverse"]
           ]
       ; text "divide_by_10"     (* divides R08 by 10, puts it R11*)
-       	  [ Cmpq,  [~%R12; ~$10]
+       	  [ Cmpq,  [~$10; ~%R12]
           ; J Lt,  [~$$"div_ret"]
           ; Subq,  [~$10; ~%R12]
           ; Addq,  [~$1; ~%R11]
           ; Jmp,   [~$$"divide_by_10"]
           ]
       ; text "mod_10"            (* stores R08 % 10 in R10 *)
-       	  [ Cmpq,  [~%R10; ~$10]
+       	  [ Cmpq,  [~$10; ~%R10]
           ; J Lt,  [~$$"mod_ret"]
           ; Subq,  [~$10; ~%R10]
           ; Jmp,   [~$$"mod_10"]
@@ -62,7 +62,14 @@ let reverse a =
 let provided_tests : suite = [
   Test ("Student-Provided Big Test for Part III: Score recorded as PartIIITestCase", [
   	("12", program_test (reverse 12) 21L);
-  	(* ("12", program_test (reverse 12L) 21L); *)
+  	("12345", program_test (reverse 12345) 54321L);
+  	("222", program_test (reverse 222) 222L);
+  	("9", program_test (reverse 9) 9L);
+  	("17471", program_test (reverse 17471) 17471L);
+  	("bigger number", program_test 
+  		(reverse 256367) 763652L);
+  	(* should not work for negatives! *)
+  	("keep negs the same", program_test (reverse (-19)) (-19L)); 
   ])
 
 ] 
