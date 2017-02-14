@@ -330,9 +330,57 @@ let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
      with Alloc.LVoid
    - LLVMlite uids and labels share a namespace. Block labels you encounter
      should be associated with Alloc.Llbl
+
+    type layout = (uid * Alloc.loc) list 
+
+  (* Basic blocks *)
+  type block = { insns: (uid * insn) list; terminator: terminator }  
+
+  (* Control Flow Graph: a pair of an entry block and a set labeled blocks *)
+  type cfg = block * (lbl * block) list
+  
+  cfg = (block, [(lbl, block),(lbl, block),(lbl, block),...])
+  
+  block.insns = [(uid,insn),(uid,insn),(uid,insn),(uid,insn),....]
+
+  return:
+  
+  layout = [(uid, ), () ]
+
 *)
+
+
+let layout_insn_classifier (m:layout * int) (l:uid * insn) : layout * int =
+  let map, count = m in
+  let new_count = count - 8 in
+  let u, i = l in
+  begin match i with
+  | Store (x,_,_) -> 
+    begin match x with
+    | Void -> (map @ [(u, Alloc.LVoid)], new_count)
+    | _ -> (map @ [(u, Alloc.LStk count)], new_count)
+    end
+  | Call (x,_,_) -> 
+    begin match x with
+    | Void -> (map @ [(u, Alloc.LVoid)], new_count)
+    | _ -> (map @ [(u, Alloc.LStk count)], new_count)
+    end
+  | _ -> (map @ [(u, Alloc.LStk count)], new_count)
+  end
+
+let label_block_helper (m:layout * int) (b:lbl * block) : layout * int =
+  let map, count = m in
+  let new_count = count - 8 in
+  let label, blk = b in
+  List.fold_left layout_insn_classifier (map @ [(label, Alloc.LLbl label)], new_count) blk.insns
+
 let stack_layout (f:Ll.fdecl) : layout =
-failwith "stack_layout unimplemented"
+  let entry_blk, blk_list = f.cfg in 
+  let map, count = List.fold_left layout_insn_classifier ([], -8) entry_blk.insns in
+  let new_map, _ = List.fold_left label_block_helper (map, count) blk_list in
+  new_map
+
+
 
 (* The code for the entry-point of a function must do several things:
 
@@ -361,7 +409,15 @@ failwith "stack_layout unimplemented"
    [ NOTE: the first six arguments are numbered 0 .. 5 ]
 *)
 let arg_loc (n : int) : operand =
-  failwith "arg_loc unimplemented"
+  begin match n with
+  | 0 -> Reg Rdi
+  | 1 -> Reg Rsi
+  | 2 -> Reg Rdx
+  | 3 -> Reg Rcx
+  | 4 -> Reg R08
+  | 5 -> Reg R09
+  | _ -> Ind3 (Lit (Int64.of_int (8*(n-4))), Rbp)
+  end
 
 
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
