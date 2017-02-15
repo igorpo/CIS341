@@ -424,9 +424,87 @@ let arg_loc (n : int) : operand =
   | _ -> Ind3 (Lit (Int64.of_int (8*(n-4))), Rbp)
   end
 
+(* 
+
+==the name of the block==
+gid = string
+
+==The type declrations related to the function==
+
+tdecls = [(tid, ty), (tid, ty),(tid, ty)]
+
+==The function declation ==
+fdecl = { 
+     fty=([arg1 type, arg2 type, ...], return type);
+     param=([uid, uid,... ])
+     cfg=(block * (lbl * block) list)
+}
+
+
+
+***return***
+
+type x86elt = 
+  | I of X86.ins
+  | L of (X86.lbl * bool)
+
+type x86stream = x86elt list 
+
+
+
+
+(* An allocated function body is just a flattened list of instructions,
+   labels, and terminators. All uids, labels, and gids are replaced with the
+   associated parts of the x86 machine *)
+type fbody = (loc * insn) list
+
+type loc =
+  | LVoid                       (* no storage *)
+  | LReg of X86.reg             (* x86 register *)
+  | LStk of int                 (* a stack offset from %rbp *)
+  | LLbl of X86.lbl             (* an assembler label *)
+*)
+
+
+(* let compile_insn (i:insn) : X86.ins list =
+  begin match i with
+  | ILbl -> 
+  | Binop (b,t,opr1,opr2) -> 
+  | Alloca t -> 
+  | Load  (t,opr) -> 
+  | Store (t,opr1,opr2) -> 
+  | Icmp (Ll.cnd,t,opr1,opr2) -> 
+  | Call (t,opr,ty_opr_list) -> 
+  | Bitcast (t,opr,t) -> 
+  | Gep (t,opr1,opr_list) -> 
+  | Ret (t,opr_option) -> 
+  | Br l -> 
+  | Cbr (opr,l1,l2) -> 
+  end *)
+
+let generate_prologue (g:gid) (l:layout) : X86.ins list = 
+  (* 
+      Generate instructions:
+        text gid
+        push rbp onto stack
+        move rsp into rbp
+      
+      @ 
+      
+      Generate instructions for
+        Subtract stack pointer with 8 * length of layout
+   *)
+  failwith "TODO: implemented"
+
+let generate_epilogue : X86.ins list = 
+  failwith "TODO: implemented"
 
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
-failwith "compile_fdecl unimplemented"
+  let l = stack_layout f in
+  let prologue = generate_prologue g l in
+  let fbody = alloc_cfg l f.cfg in
+  let body_insn = compile_fbody tdecls fbody in
+  (lift prologue) @ body_insn
 
 (* compile_gdecl ------------------------------------------------------------ *)
 
