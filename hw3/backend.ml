@@ -226,12 +226,17 @@ failwith "compile_call unimplemented"
    - the size of an array of t's with n elements is n * the size of t
    - all pointers, I1, and I64 are 8 bytes
    - the size of a named type is the size of its definition
-
    - Void, i8, and functions have undefined sizes according to LLVMlite.
      Your function should simply return 0 in those cases
 *)
 let rec size_ty tdecls t : int =
-failwith "size_ty not implemented"
+  begin match t with 
+  | I1 | I64 | Ptr _ -> 8
+  | Array (n, t_elm) -> n * (size_ty tdecls t_elm)
+  | Struct ts -> List.fold_left (fun sum c -> sum + size_ty tdecls c) 0 ts
+  | Namedt s -> size_ty tdecls (List.assoc s tdecls)
+  | _ -> 0 (* corresponds to Void, I8, Fun *)
+  end
 
 (* Generates code that computes a pointer value.  
 
