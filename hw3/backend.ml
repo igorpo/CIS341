@@ -320,7 +320,7 @@ failwith " unimplemented"
 *)
 
 let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
-  failwith "compile_fbody unimplemented"
+  lift []
 
 (* compile_fdecl ------------------------------------------------------------ *)
 
@@ -482,7 +482,11 @@ type loc =
   | Cbr (opr,l1,l2) -> 
   end *)
 
-let generate_prologue (g:gid) (l:layout) : X86.ins list = 
+let generate_prologue (l:layout) : X86.ins list = 
+  [ (Pushq,  [Reg Rbp])
+  ; (Movq,  [Reg Rsp; Reg Rbp])
+  ; (Subq,  [Imm (Lit (Int64.of_int (8 * (List.length l)))); Reg Rsp])
+  ]
   (* 
       Generate instructions:
         text gid
@@ -490,21 +494,20 @@ let generate_prologue (g:gid) (l:layout) : X86.ins list =
         move rsp into rbp
       
       @ 
-      
+
       Generate instructions for
         Subtract stack pointer with 8 * length of layout
    *)
-  failwith "TODO: implemented"
 
 let generate_epilogue : X86.ins list = 
-  failwith "TODO: implemented"
+  []
 
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let l = stack_layout f in
-  let prologue = generate_prologue g l in
+  let prologue = generate_prologue l in
   let fbody = alloc_cfg l f.cfg in
   let body_insn = compile_fbody tdecls fbody in
-  (lift prologue) @ body_insn
+  [L (g, false)] @ (lift prologue) @ body_insn
 
 (* compile_gdecl ------------------------------------------------------------ *)
 
