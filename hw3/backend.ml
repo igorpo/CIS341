@@ -165,6 +165,22 @@ let prog_of_x86stream : x86stream -> X86.prog =
     | (L (l,global))::s' -> loop ({ lbl=l; global; asm=Text iis }::p) [] s'
   in loop [] []
 
+
+
+(* let rec loop2 p iis : x86stream -> X86.prog =
+  begin match p with
+    | [] -> 
+      (match iis with
+       | [] -> p 
+       | _ -> failwith "stream has no initial label"
+     )
+    | (I i)::s' -> loop2 p (i::iis) s'
+    | (L (l,global))::s' -> loop2 ({ lbl=l; global; asm=Text iis }::p) [] s'
+  end
+
+let prog_of_x86stream2 : x86stream -> X86.prog =
+  loop2 [] [] *)
+
 (* compiling operands  ------------------------------------------------------ *)
 
 (* LLVM IR instructions support several kinds of operands.
@@ -502,12 +518,13 @@ let generate_prologue (l:layout) : X86.ins list =
 let generate_epilogue : X86.ins list = 
   []
 
+
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let l = stack_layout f in
   let prologue = generate_prologue l in
   let fbody = alloc_cfg l f.cfg in
   let body_insn = compile_fbody tdecls fbody in
-  [L (g, false)] @ (lift prologue) @ body_insn
+  (lift prologue) @ body_insn @ [L (Platform.mangle g, true)]
 
 (* compile_gdecl ------------------------------------------------------------ *)
 
