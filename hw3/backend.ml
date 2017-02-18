@@ -166,8 +166,9 @@ let prog_of_x86stream : x86stream -> X86.prog =
   in loop [] []
 
 
-(* compiling instuctions  ------------------------------------------------------ *)
-let cmp_binop (b:bop) (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
+(* compiling instructions  ------------------------------------------------- *)
+let cmp_binop (b:bop) (t:ty) (op1:Alloc.operand) 
+                                (op2:Alloc.operand) : X86.ins list =
   []
 
 (* - Alloca: needs to return a pointer into the stack *)
@@ -188,17 +189,20 @@ let cmp_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
      Icmp is exactly 0 or 1.
 
   *)
-let cmp_icmp (c:Ll.cnd) (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
+let cmp_icmp (c:Ll.cnd) (t:ty) (op1:Alloc.operand) 
+                                        (op2:Alloc.operand) : X86.ins list =
   []
 
-let cmp_call (t:ty) (op1:Alloc.operand) (t:ty) (opl:Alloc.operand list) : X86.ins list =
+let cmp_call (t:ty) (op1:Alloc.operand) (t:ty) 
+                                    (opl:Alloc.operand list) : X86.ins list =
   []
 
 (* - Bitcast: does nothing interesting at the assembly level *)
 let cmp_bitcast (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
   []
 
-let cmp_gep (t:ty) (op1:Alloc.operand) (opl:Alloc.operand list) : X86.ins list =
+let cmp_gep (t:ty) (op1:Alloc.operand)
+                                     (opl:Alloc.operand list) : X86.ins list =
   []
 
 (* 
@@ -278,7 +282,8 @@ let compile_operand : Alloc.operand -> X86.operand =
 
 let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream = 
   
-  (* among other things, put arguments that the function was called with into the registers & stack
+  (* among other things, put arguments that the
+   function was called with into the registers & stack
 
   call arg_loc ... etc
 
@@ -346,7 +351,7 @@ let rec size_ty tdecls t : int =
 *)
 
 let compile_getelementptr tdecls (t:Ll.ty) 
-                          (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
+                        (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
 failwith " unimplemented"
 
 (* compiling instructions within function bodies ---------------------------- *)
@@ -384,7 +389,8 @@ failwith " unimplemented"
     | LLbl of X86.lbl             (* an assembler label *)
 *)
 
-let compile_body_helper (l: X86.ins list) (el:Alloc.loc * Alloc.insn) : X86.ins list =
+let compile_body_helper (l: X86.ins list) 
+                                    (el:Alloc.loc * Alloc.insn) : X86.ins list =
   let lo, li = el in
   l @ compile_insn lo li
 
@@ -431,12 +437,13 @@ let label_block_helper (m:layout * int) (b:lbl * block) : layout * int =
   let map, count = m in
   let new_count = count - 8 in
   let label, blk = b in
-  List.fold_left layout_insn_classifier (map @ [(label, Alloc.LLbl label)], new_count) blk.insns
+  List.fold_left layout_insn_classifier 
+                      (map @ [(label, Alloc.LLbl label)], new_count) blk.insns
 
 let stack_layout (f:Ll.fdecl) : layout =
   let entry_blk, blk_list = f.cfg in 
-  let map, count = List.fold_left layout_insn_classifier ([], -8) entry_blk.insns in
-  let new_map, _ = List.fold_left label_block_helper (map, count) blk_list in
+  let map, c = List.fold_left layout_insn_classifier ([], -8) entry_blk.insns in
+  let new_map, _ = List.fold_left label_block_helper (map, c) blk_list in
   new_map
 
 
@@ -521,6 +528,7 @@ and compile_gdecl (_, g) = compile_ginit g
 (* compile_prog ------------------------------------------------------------- *)
 
 let compile_prog {tdecls; gdecls; fdecls} : X86.prog =
-  let g = fun (lbl, gdecl) -> Asm.data (Platform.mangle lbl) (compile_gdecl gdecl) in
-  let f = fun (name, fdecl) -> prog_of_x86stream @@ compile_fdecl tdecls name fdecl in
-  (List.map g gdecls) @ (List.map f fdecls |> List.flatten)
+  let g = fun (lbl, gdecl) -> Asm.data (Platform.mangle lbl) 
+                                                    (compile_gdecl gdecl) in
+  let f = fun (name, fdecl) -> prog_of_x86stream @@ compile_fdecl 
+tdecls name fdecl in  (List.map g gdecls) @ (List.map f fdecls |> List.flatten)
