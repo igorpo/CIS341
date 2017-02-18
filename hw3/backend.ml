@@ -166,6 +166,76 @@ let prog_of_x86stream : x86stream -> X86.prog =
   in loop [] []
 
 
+(* compiling instuctions  ------------------------------------------------------ *)
+let cmp_binop (b:bop) (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
+  []
+
+(* - Alloca: needs to return a pointer into the stack *)
+let cmp_alloca (t:ty) : X86.ins list =
+  []
+
+(* - Load & Store: these need to dereference the pointers. Const and
+     Null operands aren't valid pointers.  Don't forget to
+     Platform.mangle the global identifier. *)
+
+let cmp_load (t:ty) (op:Alloc.operand) : X86.ins list =
+  []
+
+let cmp_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
+  []
+(*  - Icmp:  the Set instruction may be of use.  Depending on how you
+     compile Cbr, you may want to ensure that the value produced by
+     Icmp is exactly 0 or 1.
+
+  *)
+let cmp_icmp (c:Ll.cnd) (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
+  []
+
+let cmp_call (t:ty) (op1:Alloc.operand) (t:ty) (opl:Alloc.operand list) : X86.ins list =
+  []
+
+(* - Bitcast: does nothing interesting at the assembly level *)
+let cmp_bitcast (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
+  []
+
+let cmp_gep (t:ty) (op1:Alloc.operand) (opl:Alloc.operand list) : X86.ins list =
+  []
+
+(* 
+- Ret should properly exit the function: freeing stack space,
+     restoring the value of %rbp, and putting the return value (if
+     any) in %rax.
+*)
+let cmp_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
+  begin match op with
+  | Some o -> []
+  | None -> [(Retq, [])]
+  end
+
+(* - Br should jump *)
+let cmp_br (l:Alloc.loc) : X86.ins list =
+  []
+(* - Cbr branch should treat its operand as a boolean conditional *)
+let cmp_cbr (op:operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
+  []
+
+let compile_insn (l:Alloc.loc) (i:Alloc.insn) : X86.ins list =
+  begin match i with
+  | ILbl -> []
+  | Binop (b, t, opr1, opr2) -> [] 
+  | Alloca t -> [] 
+  | Load  (t, opr) -> [] 
+  | Store (t, opr1, opr2) -> [] 
+  | Icmp (llcnd, t, opr1, opr2) -> [] 
+  | Call (t, opr, ty_opr_list) -> [] 
+  | Bitcast (t1, opr, t2) -> [] 
+  | Gep (t, opr1, opr_list) -> [] 
+  | Ret (t, opr_option) -> cmp_ret t opr_option
+  | Br l -> [] 
+  | Cbr (opr, l1, l2) -> [] 
+  end
+
+
 (* compiling operands  ------------------------------------------------------ *)
 
 (* LLVM IR instructions support several kinds of operands.
@@ -304,44 +374,23 @@ failwith " unimplemented"
      stream efficient. You might find it useful to define a tail-
      recursive helper function that passes an output stream as an
      accumulator.
-
-   - Icmp:  the Set instruction may be of use.  Depending on how you
-     compile Cbr, you may want to ensure that the value produced by
-     Icmp is exactly 0 or 1.
-
-   - Load & Store: these need to dereference the pointers. Const and
-     Null operands aren't valid pointers.  Don't forget to
-     Platform.mangle the global identifier.
-
-   - Alloca: needs to return a pointer into the stack
-
-   - Bitcast: does nothing interesting at the assembly level
-
-   Compiling block terminators is not too difficult:
-
-   - Ret should properly exit the function: freeing stack space,
-     restoring the value of %rbp, and putting the return value (if
-     any) in %rax.
-
-   - Br should jump
-
-   - Cbr branch should treat its operand as a boolean conditional
+  
+    type fbody = (loc * insn) list
+    
+    type loc =
+    | LVoid                       (* no storage *)
+    | LReg of X86.reg             (* x86 register *)
+    | LStk of int                 (* a stack offset from %rbp *)
+    | LLbl of X86.lbl             (* an assembler label *)
 *)
 
+let compile_body_helper (l: X86.ins list) (el:Alloc.loc * Alloc.insn) : X86.ins list =
+  let lo, li = el in
+  l @ compile_insn lo li
+
 let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
-
-  (* 
-    
-    example:
-    
-    when encounter:
-
-      some_func(1,2,3);
-
-    use compile call -> 
-
-  *)
-  lift []
+  let insn = List.fold_left compile_body_helper [] af in
+  lift insn
 
 (* compile_fdecl ------------------------------------------------------------ *)
 
@@ -356,22 +405,6 @@ let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
      with Alloc.LVoid
    - LLVMlite uids and labels share a namespace. Block labels you encounter
      should be associated with Alloc.Llbl
-
-    type layout = (uid * Alloc.loc) list 
-
-  (* Basic blocks *)
-  type block = { insns: (uid * insn) list; terminator: terminator }  
-
-  (* Control Flow Graph: a pair of an entry block and a set labeled blocks *)
-  type cfg = block * (lbl * block) list
-  
-  cfg = (block, [(lbl, block),(lbl, block),(lbl, block),...])
-  
-  block.insns = [(uid,insn),(uid,insn),(uid,insn),(uid,insn),....]
-
-  return:
-  
-  layout = [(uid, ), () ]
 
 *)
 
@@ -445,93 +478,16 @@ let arg_loc (n : int) : operand =
   | _ -> Ind3 (Lit (Int64.of_int (8*(n-4))), Rbp)
   end
 
-(* 
-
-==the name of the block==
-gid = string
-
-==The type declrations related to the function==
-
-tdecls = [(tid, ty), (tid, ty),(tid, ty)]
-
-==The function declation ==
-fdecl = { 
-     fty=([arg1 type, arg2 type, ...], return type);
-     param=([uid, uid,... ])
-     cfg=(block * (lbl * block) list)
-}
-
-
-
-***return***
-
-type x86elt = 
-  | I of X86.ins
-  | L of (X86.lbl * bool)
-
-type x86stream = x86elt list 
-
-
-
-
-(* An allocated function body is just a flattened list of instructions,
-   labels, and terminators. All uids, labels, and gids are replaced with the
-   associated parts of the x86 machine *)
-type fbody = (loc * insn) list
-
-type loc =
-  | LVoid                       (* no storage *)
-  | LReg of X86.reg             (* x86 register *)
-  | LStk of int                 (* a stack offset from %rbp *)
-  | LLbl of X86.lbl             (* an assembler label *)
-*)
-
-(* let compile_insn (i:insn) : X86.ins list =
-  begin match i with
-  | ILbl -> 
-  | Binop (b,t,opr1,opr2) -> 
-  | Alloca t -> 
-  | Load  (t,opr) -> 
-  | Store (t,opr1,opr2) -> 
-  | Icmp (Ll.cnd,t,opr1,opr2) -> 
-  | Call (t,opr,ty_opr_list) -> 
-  | Bitcast (t,opr,t) -> 
-  | Gep (t,opr1,opr_list) -> 
-  | Ret (t,opr_option) -> 
-  | Br l -> 
-  | Cbr (opr,l1,l2) -> 
-  end *)
-
-
-(* let copy_args_to_stack () : = *)
-
 let push_helper (l:X86.ins list * int) (u:uid)  : (X86.ins list * int) =
   let insns, count = l in
   let new_ins = if count < 6 then
     [(Pushq, [arg_loc count])]
   else [] in
-  ( new_ins @ insns, count + 1)
-  
-  (* [a,b,c,d,e] *)
-  (* 
-  
-  b, 1 
-  a, 0
-
-  
-  push Rsi
-  
-
-  push Rdi
-
-
-
-   *)
+  (new_ins @ insns, count + 1)
 
 let gen_push_args_to_stack (arg_list:uid list) : X86.ins list =
   let push_insns, _ = List.fold_left push_helper ([],0) arg_list in
   push_insns
-
 
 let generate_prologue (arg_list:uid list) : X86.ins list = 
   [ (Pushq,  [Reg Rbp])
@@ -540,13 +496,12 @@ let generate_prologue (arg_list:uid list) : X86.ins list =
 let generate_epilogue : X86.ins list = 
   []
 
-
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let l = stack_layout f in
   let prologue = generate_prologue f.param in
   let fbody = alloc_cfg l f.cfg in
   let body_insn = compile_fbody tdecls fbody in
-  (lift prologue) @ body_insn @ [L (Platform.mangle g, true)]
+  body_insn @ (lift prologue) @ [L (Platform.mangle g, true)]
 
 (* compile_gdecl ------------------------------------------------------------ *)
 
