@@ -179,22 +179,48 @@ let prog_of_x86stream : x86stream -> X86.prog =
    LLVMlite operand.
  *)
 let compile_operand : Alloc.operand -> X86.operand = function 
-  | Alloc.Null -> Imm (Lit 0L)
-  | Alloc.Const c -> Imm (Lit c)
-  | Alloc.Gid l -> Ind1 (Lbl l) 
+  | Alloc.Null -> 
+    Printf.printf "compile_operand: Null\n"; Imm (Lit 0L)
+  | Alloc.Const c -> 
+    Printf.printf "compile_operand: Const\n"; Imm (Lit c)
+  | Alloc.Gid l -> 
+    Printf.printf "compile_operand: Gid\n"; Ind1 (Lbl l) 
   | Alloc.Loc l -> 
     begin match l with 
-    | Alloc.LReg r -> Reg r
-    | Alloc.LStk s -> Ind3 (Lit (Int64.of_int s), Rbp)
-    | Alloc.LLbl lb -> Ind1 (Lbl lb)
+    | Alloc.LReg r -> Printf.printf "compile_operand: LReg\n"; Reg r
+    | Alloc.LStk s -> 
+        Printf.printf "compile_operand: LStk\n"; Ind3 (Lit (Int64.of_int s), Rbp)
+    | Alloc.LLbl lb -> 
+          Printf.printf "compile_operand: LLbl\n"; Ind1 (Lbl lb)
     | _ -> failwith "Cannot use this as an operand"
     end
 
 
 (* compiling instructions  ------------------------------------------------- *)
-let cmp_binop (b:bop) (t:ty) (op1:Alloc.operand) 
+
+(* | Addq | Subq | Imulq | Xorq | Orq | Andq
+            | Shlq | Sarq | Shrq *)
+let compile_bop : Ll.bop -> X86.opcode = function
+  | Add -> Addq
+  | Sub -> Subq
+  | Mul -> Imulq
+  | Shl -> Shlq
+  | Lshr -> Shrq
+  | Ashr -> Sarq
+  | And -> Andq
+  | Or -> Orq
+  | Xor-> Xorq
+
+let cmp_binop (l:Alloc.loc) (b:bop) (t:ty) (op1:Alloc.operand) 
                                 (op2:Alloc.operand) : X86.ins list =
-  []
+  let x_op1 = compile_operand op1 in
+  let x_op2 = compile_operand op2 in
+  let dest = compile_operand (Alloc.Loc l) in
+  let x_bop = compile_bop b in
+  [ Movq, [x_op1; Reg R10]
+  ; x_bop, [x_op2; Reg R10]
+  ; Movq, [Reg R10; dest]
+  ]
 
 (* - Alloca: needs to return a pointer into the stack *)
 let cmp_alloca (t:ty) : X86.ins list =
@@ -237,7 +263,7 @@ let cmp_gep (t:ty) (op1:Alloc.operand)
 *)
 let cmp_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
   let i = begin match op with
-  | Some o -> 
+  | Some o -> Printf.printf "cmp_ret: Some o \n";
     let x_op = compile_operand o in
     [Movq, [x_op; Reg Rax]]
   | None -> []
@@ -259,7 +285,7 @@ let compile_insn (l:Alloc.loc) (i:Alloc.insn) : X86.ins list =
   let open Alloc in
   begin match i with
   | ILbl -> []
-  | Binop (b, t, opr1, opr2) -> [] 
+  | Binop (b, t, opr1, opr2) -> cmp_binop l b t opr1 opr2
   | Alloca t -> [] 
   | Load  (t, opr) -> [] 
   | Store (t, opr1, opr2) -> [] 
