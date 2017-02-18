@@ -166,21 +166,6 @@ let prog_of_x86stream : x86stream -> X86.prog =
   in loop [] []
 
 
-
-(* let rec loop2 p iis : x86stream -> X86.prog =
-  begin match p with
-    | [] -> 
-      (match iis with
-       | [] -> p 
-       | _ -> failwith "stream has no initial label"
-     )
-    | (I i)::s' -> loop2 p (i::iis) s'
-    | (L (l,global))::s' -> loop2 ({ lbl=l; global; asm=Text iis }::p) [] s'
-  end
-
-let prog_of_x86stream2 : x86stream -> X86.prog =
-  loop2 [] [] *)
-
 (* compiling operands  ------------------------------------------------------ *)
 
 (* LLVM IR instructions support several kinds of operands.
@@ -222,6 +207,14 @@ let compile_operand : Alloc.operand -> X86.operand =
 
 
 let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream = 
+  
+  (* among other things, put arguments that the function was called with into the registers & stack
+
+  call arg_loc ... etc
+
+
+   *)
+
 failwith "compile_call unimplemented"
 
 (* compiling getelementptr (gep)  ------------------------------------------- *)
@@ -336,6 +329,18 @@ failwith " unimplemented"
 *)
 
 let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
+
+  (* 
+    
+    example:
+    
+    when encounter:
+
+      some_func(1,2,3);
+
+    use compile call -> 
+
+  *)
   lift []
 
 (* compile_fdecl ------------------------------------------------------------ *)
@@ -481,7 +486,6 @@ type loc =
   | LLbl of X86.lbl             (* an assembler label *)
 *)
 
-
 (* let compile_insn (i:insn) : X86.ins list =
   begin match i with
   | ILbl -> 
@@ -498,22 +502,40 @@ type loc =
   | Cbr (opr,l1,l2) -> 
   end *)
 
-let generate_prologue (l:layout) : X86.ins list = 
-  [ (Pushq,  [Reg Rbp])
-  ; (Movq,  [Reg Rsp; Reg Rbp])
-  ; (Subq,  [Imm (Lit (Int64.of_int (8 * (List.length l)))); Reg Rsp])
-  ]
-  (* 
-      Generate instructions:
-        text gid
-        push rbp onto stack
-        move rsp into rbp
-      
-      @ 
 
-      Generate instructions for
-        Subtract stack pointer with 8 * length of layout
+(* let copy_args_to_stack () : = *)
+
+let push_helper (l:X86.ins list * int) (u:uid)  : (X86.ins list * int) =
+  let insns, count = l in
+  let new_ins = if count < 6 then
+    [(Pushq, [arg_loc count])]
+  else [] in
+  ( new_ins @ insns, count + 1)
+  
+  (* [a,b,c,d,e] *)
+  (* 
+  
+  b, 1 
+  a, 0
+
+  
+  push Rsi
+  
+
+  push Rdi
+
+
+
    *)
+
+let gen_push_args_to_stack (arg_list:uid list) : X86.ins list =
+  let push_insns, _ = List.fold_left push_helper ([],0) arg_list in
+  push_insns
+
+
+let generate_prologue (arg_list:uid list) : X86.ins list = 
+  [ (Pushq,  [Reg Rbp])
+  ; (Movq,  [Reg Rsp; Reg Rbp])] @ gen_push_args_to_stack arg_list
 
 let generate_epilogue : X86.ins list = 
   []
@@ -521,7 +543,7 @@ let generate_epilogue : X86.ins list =
 
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let l = stack_layout f in
-  let prologue = generate_prologue l in
+  let prologue = generate_prologue f.param in
   let fbody = alloc_cfg l f.cfg in
   let body_insn = compile_fbody tdecls fbody in
   (lift prologue) @ body_insn @ [L (Platform.mangle g, true)]

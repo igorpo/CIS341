@@ -10,7 +10,7 @@
 
 
 */*.out
-
+*/output/
 # ocamlbuild working directory
 */_build/
 
