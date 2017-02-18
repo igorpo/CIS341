@@ -166,6 +166,31 @@ let prog_of_x86stream : x86stream -> X86.prog =
   in loop [] []
 
 
+(* compiling operands  ------------------------------------------------------ *)
+
+(* LLVM IR instructions support several kinds of operands.
+
+   LL local %uids live in stack slots, whereas global ids live at
+   global addresses that must be computed from a label.  Constants are
+   immediately available, and the operand Null is the 64-bit 0 value.
+
+   You might find it useful to implement the following helper function, 
+   whose job is to generate the X86 operand corresponding to an allocated 
+   LLVMlite operand.
+ *)
+let compile_operand : Alloc.operand -> X86.operand = function 
+  | Alloc.Null -> Imm (Lit 0L)
+  | Alloc.Const c -> Imm (Lit c)
+  | Alloc.Gid l -> Ind1 (Lbl l) 
+  | Alloc.Loc l -> 
+    begin match l with 
+    | Alloc.LReg r -> Reg r
+    | Alloc.LStk s -> Ind3 (Lit (Int64.of_int s), Rbp)
+    | Alloc.LLbl lb -> Ind1 (Lbl lb)
+    | _ -> failwith "Cannot use this as an operand"
+    end
+
+
 (* compiling instructions  ------------------------------------------------- *)
 let cmp_binop (b:bop) (t:ty) (op1:Alloc.operand) 
                                 (op2:Alloc.operand) : X86.ins list =
@@ -211,10 +236,17 @@ let cmp_gep (t:ty) (op1:Alloc.operand)
      any) in %rax.
 *)
 let cmp_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
-  begin match op with
-  | Some o -> []
-  | None -> [(Retq, [])]
-  end
+  let i = begin match op with
+  | Some o -> 
+    let x_op = compile_operand o in
+    [Movq, [x_op; Reg Rax]]
+  | None -> []
+  end in
+  i @ 
+  [ Movq, [Reg Rbp; Reg Rsp]
+  ; Popq, [Reg Rbp]
+  ; Retq, []
+  ]
 
 (* - Br should jump *)
 let cmp_br (l:Alloc.loc) : X86.ins list =
@@ -224,6 +256,7 @@ let cmp_cbr (op:operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
   []
 
 let compile_insn (l:Alloc.loc) (i:Alloc.insn) : X86.ins list =
+  let open Alloc in
   begin match i with
   | ILbl -> []
   | Binop (b, t, opr1, opr2) -> [] 
@@ -238,33 +271,6 @@ let compile_insn (l:Alloc.loc) (i:Alloc.insn) : X86.ins list =
   | Br l -> [] 
   | Cbr (opr, l1, l2) -> [] 
   end
-
-
-(* compiling operands  ------------------------------------------------------ *)
-
-(* LLVM IR instructions support several kinds of operands.
-
-   LL local %uids live in stack slots, whereas global ids live at
-   global addresses that must be computed from a label.  Constants are
-   immediately available, and the operand Null is the 64-bit 0 value.
-
-   You might find it useful to implement the following helper function, 
-   whose job is to generate the X86 operand corresponding to an allocated 
-   LLVMlite operand.
- *)
-let compile_operand : Alloc.operand -> X86.operand = function 
-  | Null -> Imm (Lit 0L)
-  | Const c -> Imm (Lit c)
-  | Gid l -> Ind1 (Lbl l) 
-  | Loc l -> 
-    begin match l with 
-    | LReg r -> Reg r
-    | LStk s -> Ind3 (Lit (Int64.of_int s), Rbp)
-    | LLbl lb -> Ind1 (Lbl lb)
-    | _ -> failwith "Cannot use this as an operand"
-    end
-
-
 
 
 (* compiling call  ---------------------------------------------------------- *)
@@ -509,15 +515,16 @@ let generate_prologue (arg_list:uid list) : X86.ins list =
   [ (Pushq,  [Reg Rbp])
   ; (Movq,  [Reg Rsp; Reg Rbp])] @ gen_push_args_to_stack arg_list
 
-let generate_epilogue : X86.ins list = 
-  []
+let generate_epilogue (l:layout) : X86.ins list = 
+  [] (* subtract from Rsp *)
 
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let l = stack_layout f in
   let prologue = generate_prologue f.param in
   let fbody = alloc_cfg l f.cfg in
   let body_insn = compile_fbody tdecls fbody in
-  body_insn @ (lift prologue) @ [L (Platform.mangle g, true)]
+  let epilogue = generate_epilogue l in
+  (lift epilogue) @ body_insn @ (lift prologue) @ [L (Platform.mangle g, true)]
 
 (* compile_gdecl ------------------------------------------------------------ *)
 
