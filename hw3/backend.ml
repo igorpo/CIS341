@@ -252,8 +252,17 @@ let compile_insn (l:Alloc.loc) (i:Alloc.insn) : X86.ins list =
    whose job is to generate the X86 operand corresponding to an allocated 
    LLVMlite operand.
  *)
-let compile_operand : Alloc.operand -> X86.operand = 
-  function _ -> failwith "compile_operand unimplemented"
+let compile_operand : Alloc.operand -> X86.operand = function 
+  | Null -> Imm (Lit 0L)
+  | Const c -> Imm (Lit c)
+  | Gid l -> Ind1 (Lbl l) 
+  | Loc l -> 
+    begin match l with 
+    | LReg r -> Reg r
+    | LStk s -> Ind3 (Lit (Int64.of_int s), Rbp)
+    | LLbl lb -> Ind1 (Lbl lb)
+    | _ -> failwith "Cannot use this as an operand"
+    end
 
 
 
