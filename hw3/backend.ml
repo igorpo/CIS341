@@ -190,7 +190,7 @@ let compile_operand : Alloc.operand -> X86.operand = function
     | Alloc.LReg r -> Reg r(*Printf.printf "compile_operand: LReg\n";*) 
     | Alloc.LStk s -> Ind3 (Lit (Int64.of_int s), Rbp)
         (* Printf.printf "compile_operand: LStk\n"; *)
-    | Alloc.LLbl lb -> (* Ind3 (Imm (Lbl lb), Rip) *)Imm (Lbl (Platform.mangle lb))
+    | Alloc.LLbl lb -> Imm (Lbl (Platform.mangle lb))
           (* Printf.printf "compile_operand: LLbl %s\n" lb;  *)
     | _ -> failwith "Cannot use this as an operand"
     end
@@ -211,7 +211,7 @@ let compile_bop : Ll.bop -> X86.opcode = function
   | Or -> Orq
   | Xor-> Xorq
 
-let cmp_binop (l:Alloc.loc) (b:bop) (t:ty) (op1:Alloc.operand) 
+let cmpl_binop (l:Alloc.loc) (b:bop) (t:ty) (op1:Alloc.operand) 
                                 (op2:Alloc.operand) : X86.ins list =
   let x_op1 = compile_operand op1 in
   let x_op2 = compile_operand op2 in
@@ -222,37 +222,89 @@ let cmp_binop (l:Alloc.loc) (b:bop) (t:ty) (op1:Alloc.operand)
   ; Movq, [Reg R10; dest]
   ]
 
+
+(* Helper function to compile LLVM CC to X86 CC *)
+let cmpl_cnd : Ll.cnd -> X86.cnd = function
+  | Eq -> Eq 
+  | Ne -> Neq 
+  | Sgt -> Gt 
+  | Sge -> Ge 
+  | Slt -> Lt 
+  | Sle -> Le
+
 (* - Alloca: needs to return a pointer into the stack *)
-let cmp_alloca (t:ty) : X86.ins list =
+let cmpl_alloca (t:ty) : X86.ins list =
   []
 
 (* - Load & Store: these need to dereference the pointers. Const and
      Null operands aren't valid pointers.  Don't forget to
      Platform.mangle the global identifier. *)
 
-let cmp_load (t:ty) (op:Alloc.operand) : X86.ins list =
+let cmpl_load (t:ty) (op:Alloc.operand) : X86.ins list =
   []
 
-let cmp_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
+let cmpl_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
   []
+
+(* - Cbr branch should treat its operand as a boolean conditional 
+*)
+let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
+  let x_op = compile_operand op in
+  let x_lbl1 = compile_operand (Alloc.Loc l1) in
+  let x_lbl2 = compile_operand (Alloc.Loc l2) in
+  Printf.printf "x_lbl1 = %s\n" (string_of_operand x_lbl1);
+  Printf.printf "x_lbl2 = %s\n" (string_of_operand x_lbl2);
+  [ Movq, [Imm (Lit 0L); Reg R11]
+  ; Cmpq, [x_op;  Reg R11] 
+  ; J Eq,     [x_lbl1]
+  ; Jmp,      [x_lbl2]
+  ]
+  (* 
+    
+      if lo == 0    <-- lo is a location
+        jump x_lbl2
+      else
+        jump x_lbl1
+      
+
+      cmpq eq lo 1
+      jmp eq l1
+      jmp l2
+   *)
+
+
+  
+
+
 (*  - Icmp:  the Set instruction may be of use.  Depending on how you
      compile Cbr, you may want to ensure that the value produced by
      Icmp is exactly 0 or 1.
-
   *)
-let cmp_icmp (c:Ll.cnd) (t:ty) (op1:Alloc.operand) 
+let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand) 
                                         (op2:Alloc.operand) : X86.ins list =
-  []
+  let cc = cmpl_cnd c in
+  let lo = 
+    begin match l with
+    | Alloc.LStk ls -> compile_operand (Alloc.Loc l)
+    | _ -> failwith "can't handle this type here"
+    end in
+  let x_op1 = compile_operand op1 in
+  let x_op2 = compile_operand op2 in
+  [ Movq, [x_op2; Reg R11]
+  ; Movq, [Imm (Lit 0L); lo]  (* zero-init lo *)
+  ; Cmpq, [x_op1; Reg R11] 
+  ; Set cc, [lo]
+  ]
 
-let cmp_call (t:ty) (op1:Alloc.operand) (t:ty) 
+let cmpl_call (t:ty) (op1:Alloc.operand) (t:ty) 
                                     (opl:Alloc.operand list) : X86.ins list =
   []
 
 (* - Bitcast: does nothing interesting at the assembly level *)
-let cmp_bitcast (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
+let cmpl_bitcast (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
   []
 
-let cmp_gep (t:ty) (op1:Alloc.operand)
+let cmpl_gep (t:ty) (op1:Alloc.operand)
                                      (opl:Alloc.operand list) : X86.ins list =
   []
 
@@ -261,9 +313,9 @@ let cmp_gep (t:ty) (op1:Alloc.operand)
      restoring the value of %rbp, and putting the return value (if
      any) in %rax.
 *)
-let cmp_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
+let cmpl_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
   let i = begin match op with
-  | Some o -> (* Printf.printf "cmp_ret: Some o \n"; *)
+  | Some o -> (* Printf.printf "cmpl_ret: Some o \n"; *)
     let x_op = compile_operand o in
     [Movq, [x_op; Reg Rax]]
   | None -> []
@@ -275,33 +327,28 @@ let cmp_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
   ]
 
 (* - Br should jump *)
-let cmp_br (l:Alloc.loc) : X86.ins list =
+let cmpl_br (l:Alloc.loc) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
   [Jmp, [dest]]
 
-(* - Cbr branch should treat its operand as a boolean conditional *)
-let cmp_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
-  []
-
 let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
-  (* let open Alloc in  *)
   begin match i with
   | Alloc.ILbl ->
     begin match l with 
     | Alloc.LLbl lb -> [L (lb, false)]
     | _ -> failwith "don't know what to do with you"
     end
-  | Alloc.Binop (b, t, opr1, opr2) -> lift @@ cmp_binop l b t opr1 opr2
+  | Alloc.Binop (b, t, opr1, opr2) -> lift @@ cmpl_binop l b t opr1 opr2
   | Alloc.Alloca t -> [] 
   | Alloc.Load  (t, opr) -> [] 
   | Alloc.Store (t, opr1, opr2) -> [] 
-  | Alloc.Icmp (llcnd, t, opr1, opr2) -> [] 
+  | Alloc.Icmp (llcnd, t, opr1, opr2) -> lift @@ cmpl_icmp l llcnd t opr1 opr2
   | Alloc.Call (t, opr, ty_opr_list) -> [] 
   | Alloc.Bitcast (t1, opr, t2) -> [] 
   | Alloc.Gep (t, opr1, opr_list) -> [] 
-  | Alloc.Ret (t, opr_option) -> lift @@ cmp_ret t opr_option
-  | Alloc.Br l -> lift @@ cmp_br l
-  | Alloc.Cbr (opr, l1, l2) -> lift @@ cmp_cbr opr l1 l2
+  | Alloc.Ret (t, opr_option) -> lift @@ cmpl_ret t opr_option
+  | Alloc.Br l -> lift @@ cmpl_br l
+  | Alloc.Cbr (opr, l1, l2) -> lift @@ cmpl_cbr opr l1 l2
   end
 
 
