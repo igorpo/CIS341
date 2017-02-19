@@ -180,18 +180,18 @@ let prog_of_x86stream : x86stream -> X86.prog =
  *)
 let compile_operand : Alloc.operand -> X86.operand = function 
   | Alloc.Null -> 
-    Printf.printf "compile_operand: Null\n"; Imm (Lit 0L)
+    (* Printf.printf "compile_operand: Null\n"; *)Imm (Lit 0L) 
   | Alloc.Const c -> 
-    Printf.printf "compile_operand: Const\n"; Imm (Lit c)
+    (* Printf.printf "compile_operand: Const\n"; *)Imm (Lit c) 
   | Alloc.Gid l -> 
-    Printf.printf "compile_operand: Gid\n"; Ind1 (Lbl l) 
+    (* Printf.printf "compile_operand: Gid\n";*) Ind1 (Lbl l)
   | Alloc.Loc l -> 
     begin match l with 
-    | Alloc.LReg r -> Printf.printf "compile_operand: LReg\n"; Reg r
+    | Alloc.LReg r -> (*Printf.printf "compile_operand: LReg\n";*) Reg r
     | Alloc.LStk s -> 
-        Printf.printf "compile_operand: LStk\n"; Ind3 (Lit (Int64.of_int s), Rbp)
+        (* Printf.printf "compile_operand: LStk\n"; *)Ind3 (Lit (Int64.of_int s), Rbp)
     | Alloc.LLbl lb -> 
-          Printf.printf "compile_operand: LLbl\n"; Ind1 (Lbl lb)
+          Printf.printf "compile_operand: LLbl %s\n" lb; Ind3 (Lbl lb, Rip)
     | _ -> failwith "Cannot use this as an operand"
     end
 
@@ -263,7 +263,7 @@ let cmp_gep (t:ty) (op1:Alloc.operand)
 *)
 let cmp_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
   let i = begin match op with
-  | Some o -> Printf.printf "cmp_ret: Some o \n";
+  | Some o -> (* Printf.printf "cmp_ret: Some o \n"; *)
     let x_op = compile_operand o in
     [Movq, [x_op; Reg Rax]]
   | None -> []
@@ -276,15 +276,21 @@ let cmp_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
 
 (* - Br should jump *)
 let cmp_br (l:Alloc.loc) : X86.ins list =
-  []
+  let dest = compile_operand (Alloc.Loc l) in
+  [Jmp, [dest]]
+
 (* - Cbr branch should treat its operand as a boolean conditional *)
-let cmp_cbr (op:operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
+let cmp_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
   []
 
 let compile_insn (l:Alloc.loc) (i:Alloc.insn) : X86.ins list =
   let open Alloc in
   begin match i with
   | ILbl -> []
+    (* begin match l with 
+    | LLbl lb -> [L (lb, false)]
+    | _ -> failwith "don't know what to do with you"
+    end *)
   | Binop (b, t, opr1, opr2) -> cmp_binop l b t opr1 opr2
   | Alloca t -> [] 
   | Load  (t, opr) -> [] 
@@ -294,8 +300,8 @@ let compile_insn (l:Alloc.loc) (i:Alloc.insn) : X86.ins list =
   | Bitcast (t1, opr, t2) -> [] 
   | Gep (t, opr1, opr_list) -> [] 
   | Ret (t, opr_option) -> cmp_ret t opr_option
-  | Br l -> [] 
-  | Cbr (opr, l1, l2) -> [] 
+  | Br l -> cmp_br l
+  | Cbr (opr, l1, l2) -> cmp_cbr opr l1 l2
   end
 
 
@@ -482,9 +488,9 @@ let label_block_helper (m:layout * int) (b:lbl * block) : layout * int =
                       (map @ [(label, Alloc.LLbl label)], new_count) blk.insns
 
 let stack_layout (f:Ll.fdecl) : layout =
-  let entry_blk, blk_list = f.cfg in 
+  let entry_blk, lbld_blks = f.cfg in 
   let map, c = List.fold_left layout_insn_classifier ([], -8) entry_blk.insns in
-  let new_map, _ = List.fold_left label_block_helper (map, c) blk_list in
+  let new_map, _ = List.fold_left label_block_helper (map, c) lbld_blks in
   new_map
 
 
@@ -542,7 +548,7 @@ let generate_prologue (arg_list:uid list) : X86.ins list =
   ; (Movq,  [Reg Rsp; Reg Rbp])] @ gen_push_args_to_stack arg_list
 
 let generate_epilogue (l:layout) : X86.ins list = 
-  [] (* subtract from Rsp *)
+  [] (* TODO: subtract from Rsp *)
 
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let l = stack_layout f in
