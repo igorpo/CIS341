@@ -179,19 +179,19 @@ let prog_of_x86stream : x86stream -> X86.prog =
    LLVMlite operand.
  *)
 let compile_operand : Alloc.operand -> X86.operand = function 
-  | Alloc.Null -> 
-    (* Printf.printf "compile_operand: Null\n"; *)Imm (Lit 0L) 
-  | Alloc.Const c -> 
-    (* Printf.printf "compile_operand: Const\n"; *)Imm (Lit c) 
-  | Alloc.Gid l -> 
-    (* Printf.printf "compile_operand: Gid\n";*) Ind1 (Lbl l)
+  | Alloc.Null -> Imm (Lit 0L) 
+    (* Printf.printf "compile_operand: Null\n"; *)
+  | Alloc.Const c -> Imm (Lit c) 
+    (* Printf.printf "compile_operand: Const\n"; *)
+  | Alloc.Gid l -> Ind1 (Lbl l)
+    (* Printf.printf "compile_operand: Gid\n";*) 
   | Alloc.Loc l -> 
     begin match l with 
-    | Alloc.LReg r -> (*Printf.printf "compile_operand: LReg\n";*) Reg r
-    | Alloc.LStk s -> 
-        (* Printf.printf "compile_operand: LStk\n"; *)Ind3 (Lit (Int64.of_int s), Rbp)
-    | Alloc.LLbl lb -> 
-          Printf.printf "compile_operand: LLbl %s\n" lb; Ind3 (Lbl lb, Rip)
+    | Alloc.LReg r -> Reg r(*Printf.printf "compile_operand: LReg\n";*) 
+    | Alloc.LStk s -> Ind3 (Lit (Int64.of_int s), Rbp)
+        (* Printf.printf "compile_operand: LStk\n"; *)
+    | Alloc.LLbl lb -> (* Ind3 (Imm (Lbl lb), Rip) *)Imm (Lbl (Platform.mangle lb))
+          (* Printf.printf "compile_operand: LLbl %s\n" lb;  *)
     | _ -> failwith "Cannot use this as an operand"
     end
 
