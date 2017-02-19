@@ -283,25 +283,25 @@ let cmp_br (l:Alloc.loc) : X86.ins list =
 let cmp_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
   []
 
-let compile_insn (l:Alloc.loc) (i:Alloc.insn) : X86.ins list =
-  let open Alloc in
+let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
+  (* let open Alloc in  *)
   begin match i with
-  | ILbl -> []
-    (* begin match l with 
-    | LLbl lb -> [L (lb, false)]
+  | Alloc.ILbl ->
+    begin match l with 
+    | Alloc.LLbl lb -> [L (lb, false)]
     | _ -> failwith "don't know what to do with you"
-    end *)
-  | Binop (b, t, opr1, opr2) -> cmp_binop l b t opr1 opr2
-  | Alloca t -> [] 
-  | Load  (t, opr) -> [] 
-  | Store (t, opr1, opr2) -> [] 
-  | Icmp (llcnd, t, opr1, opr2) -> [] 
-  | Call (t, opr, ty_opr_list) -> [] 
-  | Bitcast (t1, opr, t2) -> [] 
-  | Gep (t, opr1, opr_list) -> [] 
-  | Ret (t, opr_option) -> cmp_ret t opr_option
-  | Br l -> cmp_br l
-  | Cbr (opr, l1, l2) -> cmp_cbr opr l1 l2
+    end
+  | Alloc.Binop (b, t, opr1, opr2) -> lift @@ cmp_binop l b t opr1 opr2
+  | Alloc.Alloca t -> [] 
+  | Alloc.Load  (t, opr) -> [] 
+  | Alloc.Store (t, opr1, opr2) -> [] 
+  | Alloc.Icmp (llcnd, t, opr1, opr2) -> [] 
+  | Alloc.Call (t, opr, ty_opr_list) -> [] 
+  | Alloc.Bitcast (t1, opr, t2) -> [] 
+  | Alloc.Gep (t, opr1, opr_list) -> [] 
+  | Alloc.Ret (t, opr_option) -> lift @@ cmp_ret t opr_option
+  | Alloc.Br l -> lift @@ cmp_br l
+  | Alloc.Cbr (opr, l1, l2) -> lift @@ cmp_cbr opr l1 l2
   end
 
 
@@ -436,14 +436,14 @@ failwith " unimplemented"
     | LLbl of X86.lbl             (* an assembler label *)
 *)
 
-let compile_body_helper (l: X86.ins list) 
-                                    (el:Alloc.loc * Alloc.insn) : X86.ins list =
+let compile_body_helper (l: x86stream) 
+                                    (el:Alloc.loc * Alloc.insn) : x86stream =
   let lo, li = el in
-  l @ compile_insn lo li
+  compile_insn lo li @ l 
 
 let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
   let insn = List.fold_left compile_body_helper [] af in
-  lift insn
+  insn
 
 (* compile_fdecl ------------------------------------------------------------ *)
 
