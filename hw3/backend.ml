@@ -1,4 +1,4 @@
-(* ll ir compilation -------------------------------------------------------- *)
+ (* ll ir compilation -------------------------------------------------------- *)
 
 open Ll
 open X86
@@ -233,8 +233,14 @@ let cmpl_cnd : Ll.cnd -> X86.cnd = function
 
 (* - Alloca: needs to return a pointer into the stack *)
 let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
-  let dest = compile_operand (Alloc.Loc l) in
-  []
+  (* let dest = compile_operand (Alloc.Loc l) in *)
+  [Subq, [Imm (Lit 8L); Reg Rsp]]
+  (* 
+    Rsp -> R11
+
+    Decrement Rsp by 8
+
+  *)
 
 (* - Load & Store: these need to dereference the pointers. Const and
      Null operands aren't valid pointers.  Don't forget to
@@ -245,8 +251,8 @@ let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
   let x_op = 
   begin match op with
     | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
-    | Gid gl -> compile_operand_base Rip op
-    | Loc lo -> compile_operand (Alloc.Loc lo)
+    | Alloc.Gid gl -> compile_operand_base Rip op
+    | Alloc.Loc lo -> compile_operand (Alloc.Loc lo)
   end in 
   [ Movq, [x_op; Reg R11]
   ; Movq, [Reg R11; dest]
@@ -642,3 +648,16 @@ let compile_prog {tdecls; gdecls; fdecls} : X86.prog =
                                                     (compile_gdecl gdecl) in
   let f = fun (name, fdecl) -> prog_of_x86stream @@ compile_fdecl 
 tdecls name fdecl in  (List.map g gdecls) @ (List.map f fdecls |> List.flatten)
+
+
+
+
+
+
+(*
+  TODO:
+  
+  Weird things to verify:
+    + Leaq situation vs Movq
+
+*)
