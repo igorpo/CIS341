@@ -233,6 +233,7 @@ let cmpl_cnd : Ll.cnd -> X86.cnd = function
 
 (* - Alloca: needs to return a pointer into the stack *)
 let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
+  let dest = compile_operand (Alloc.Loc l) in
   []
 
 (* - Load & Store: these need to dereference the pointers. Const and
@@ -244,7 +245,8 @@ let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
   let x_op = 
   begin match op with
     | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
-    | _ -> compile_operand_base Rip op
+    | Gid gl -> compile_operand_base Rip op
+    | Loc lo -> compile_operand (Alloc.Loc lo)
   end in 
   [ Movq, [x_op; Reg R11]
   ; Movq, [Reg R11; dest]
@@ -306,8 +308,12 @@ let cmpl_call (t:ty) (op1:Alloc.operand) (t:ty)
   []
 
 (* - Bitcast: does nothing interesting at the assembly level *)
-let cmpl_bitcast (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
-  []
+let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
+  let dest = compile_operand (Alloc.Loc l) in
+  let x_xop = compile_operand op in
+  [ Movq, [x_xop; Reg R11]
+  ; Movq, [Reg R11; dest]
+  ]
 
 let cmpl_gep (t:ty) (op1:Alloc.operand)
                                      (opl:Alloc.operand list) : X86.ins list =
@@ -353,7 +359,7 @@ let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
   | Alloc.Store (t, opr1, opr2) -> lift @@ cmpl_store t opr1 opr2 
   | Alloc.Icmp (llcnd, t, opr1, opr2) -> lift @@ cmpl_icmp l llcnd t opr1 opr2
   | Alloc.Call (t, opr, ty_opr_list) -> [] 
-  | Alloc.Bitcast (t1, opr, t2) -> [] 
+  | Alloc.Bitcast (t1, opr, t2) -> lift @@ cmpl_bitcast l t1 opr t2
   | Alloc.Gep (t, opr1, opr_list) -> [] 
   | Alloc.Ret (t, opr_option) -> lift @@ cmpl_ret t opr_option
   | Alloc.Br l -> lift @@ cmpl_br l
