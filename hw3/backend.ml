@@ -178,22 +178,21 @@ let prog_of_x86stream : x86stream -> X86.prog =
    whose job is to generate the X86 operand corresponding to an allocated 
    LLVMlite operand.
  *)
-let compile_operand : Alloc.operand -> X86.operand = function 
+
+let compile_operand_base (b:X86.reg) : Alloc.operand -> X86.operand = function 
   | Alloc.Null -> Imm (Lit 0L) 
-    (* Printf.printf "compile_operand: Null\n"; *)
   | Alloc.Const c -> Imm (Lit c) 
-    (* Printf.printf "compile_operand: Const\n"; *)
-  | Alloc.Gid l -> Ind1 (Lbl l)
-    (* Printf.printf "compile_operand: Gid\n";*) 
+  | Alloc.Gid l -> Ind3 (Lbl l, b)
   | Alloc.Loc l -> 
     begin match l with 
-    | Alloc.LReg r -> Reg r(*Printf.printf "compile_operand: LReg\n";*) 
-    | Alloc.LStk s -> Ind3 (Lit (Int64.of_int s), Rbp)
-        (* Printf.printf "compile_operand: LStk\n"; *)
+    | Alloc.LReg r -> Reg r
+    | Alloc.LStk s -> Ind3 (Lit (Int64.of_int s), b)
     | Alloc.LLbl lb -> Imm (Lbl (Platform.mangle lb))
-          (* Printf.printf "compile_operand: LLbl %s\n" lb;  *)
     | _ -> failwith "Cannot use this as an operand"
     end
+
+let compile_operand o = compile_operand_base Rbp o
+
 
 
 (* compiling instructions  ------------------------------------------------- *)
@@ -233,18 +232,40 @@ let cmpl_cnd : Ll.cnd -> X86.cnd = function
   | Sle -> Le
 
 (* - Alloca: needs to return a pointer into the stack *)
-let cmpl_alloca (t:ty) : X86.ins list =
+let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
   []
 
 (* - Load & Store: these need to dereference the pointers. Const and
      Null operands aren't valid pointers.  Don't forget to
      Platform.mangle the global identifier. *)
 
-let cmpl_load (t:ty) (op:Alloc.operand) : X86.ins list =
-  []
+let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
+  let dest = compile_operand (Alloc.Loc l) in
+  let x_op = 
+  begin match op with
+    | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
+    | _ -> compile_operand_base Rip op
+  end in 
+  [ Movq, [x_op; Reg R11]
+  ; Movq, [Reg R11; dest]
+  ]
+
+  (* begin match t with
+  | Void -> []
+  | I1 | I8 | I64 -> []
+  | Ptr t -> []
+  | Struct ty_list -> []
+  | Array (_int, _ty) -> []
+  | Fun f -> []
+  | Namedt t -> []
+  end  *)
 
 let cmpl_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
-  []
+  let x_op1 = compile_operand op1 in
+  let x_op2 = compile_operand op2 in
+  [ Movq, [x_op1; Reg R11]
+  ; Movq, [Reg R11; x_op2] 
+  ]
 
 (* - Cbr branch should treat its operand as a boolean conditional 
 *)
@@ -252,29 +273,13 @@ let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
   let x_op = compile_operand op in
   let x_lbl1 = compile_operand (Alloc.Loc l1) in
   let x_lbl2 = compile_operand (Alloc.Loc l2) in
-  Printf.printf "x_lbl1 = %s\n" (string_of_operand x_lbl1);
-  Printf.printf "x_lbl2 = %s\n" (string_of_operand x_lbl2);
+  (* Printf.printf "x_lbl1 = %s\n" (string_of_operand x_lbl1);
+  Printf.printf "x_lbl2 = %s\n" (string_of_operand x_lbl2); *)
   [ Movq, [Imm (Lit 0L); Reg R11]
   ; Cmpq, [x_op;  Reg R11] 
   ; J Eq,     [x_lbl1]
   ; Jmp,      [x_lbl2]
   ]
-  (* 
-    
-      if lo == 0    <-- lo is a location
-        jump x_lbl2
-      else
-        jump x_lbl1
-      
-
-      cmpq eq lo 1
-      jmp eq l1
-      jmp l2
-   *)
-
-
-  
-
 
 (*  - Icmp:  the Set instruction may be of use.  Depending on how you
      compile Cbr, you may want to ensure that the value produced by
@@ -318,6 +323,7 @@ let cmpl_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
   | Some o -> (* Printf.printf "cmpl_ret: Some o \n"; *)
     let x_op = compile_operand o in
     [Movq, [x_op; Reg Rax]]
+    (* [] *)
   | None -> []
   end in
   i @ 
@@ -331,17 +337,20 @@ let cmpl_br (l:Alloc.loc) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
   [Jmp, [dest]]
 
-let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
-  begin match i with
-  | Alloc.ILbl ->
-    begin match l with 
+
+let cmpl_ilbl l : x86elt list = 
+  begin match l with 
     | Alloc.LLbl lb -> [L (lb, false)]
     | _ -> failwith "don't know what to do with you"
-    end
+  end
+
+let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
+  begin match i with
+  | Alloc.ILbl -> cmpl_ilbl l
   | Alloc.Binop (b, t, opr1, opr2) -> lift @@ cmpl_binop l b t opr1 opr2
-  | Alloc.Alloca t -> [] 
-  | Alloc.Load  (t, opr) -> [] 
-  | Alloc.Store (t, opr1, opr2) -> [] 
+  | Alloc.Alloca t -> lift @@ cmpl_alloca l t
+  | Alloc.Load  (t, opr) -> lift @@ cmpl_load l t opr 
+  | Alloc.Store (t, opr1, opr2) -> lift @@ cmpl_store t opr1 opr2 
   | Alloc.Icmp (llcnd, t, opr1, opr2) -> lift @@ cmpl_icmp l llcnd t opr1 opr2
   | Alloc.Call (t, opr, ty_opr_list) -> [] 
   | Alloc.Bitcast (t1, opr, t2) -> [] 
