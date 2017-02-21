@@ -309,9 +309,6 @@ let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand)
   ; Set cc, [lo]
   ]
 
-let cmpl_call (t:ty) (op1:Alloc.operand) (t:ty) 
-                                    (opl:Alloc.operand list) : X86.ins list =
-  []
 
 (* - Bitcast: does nothing interesting at the assembly level *)
 let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
@@ -335,7 +332,6 @@ let cmpl_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
   | Some o -> (* Printf.printf "cmpl_ret: Some o \n"; *)
     let x_op = compile_operand o in
     [Movq, [x_op; Reg Rax]]
-    (* [] *)
   | None -> []
   end in
   i @ 
@@ -356,21 +352,6 @@ let cmpl_ilbl l : x86elt list =
     | _ -> failwith "don't know what to do with you"
   end
 
-let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
-  begin match i with
-  | Alloc.ILbl -> cmpl_ilbl l
-  | Alloc.Binop (b, t, opr1, opr2) -> lift @@ cmpl_binop l b t opr1 opr2
-  | Alloc.Alloca t -> lift @@ cmpl_alloca l t
-  | Alloc.Load  (t, opr) -> lift @@ cmpl_load l t opr 
-  | Alloc.Store (t, opr1, opr2) -> lift @@ cmpl_store t opr1 opr2 
-  | Alloc.Icmp (llcnd, t, opr1, opr2) -> lift @@ cmpl_icmp l llcnd t opr1 opr2
-  | Alloc.Call (t, opr, ty_opr_list) -> [] 
-  | Alloc.Bitcast (t1, opr, t2) -> lift @@ cmpl_bitcast l t1 opr t2
-  | Alloc.Gep (t, opr1, opr_list) -> [] 
-  | Alloc.Ret (t, opr_option) -> lift @@ cmpl_ret t opr_option
-  | Alloc.Br l -> lift @@ cmpl_br l
-  | Alloc.Cbr (opr, l1, l2) -> lift @@ cmpl_cbr opr l1 l2
-  end
 
 
 (* compiling call  ---------------------------------------------------------- *)
@@ -394,18 +375,14 @@ let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
 *)
 
 
+let compile_call_helper (i:X86.ins list * int) (os:ty * Alloc.operand) : X86.ins list * int =
+  let ins, count = i in
+  let _, op 
 
 let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream = 
-  
-  (* among other things, put arguments that the
-   function was called with into the registers & stack
-
-  call arg_loc ... etc
+  let ins, _, _ = List.fold_left compile_call_helper ([], 0) os
 
 
-   *)
-
-failwith "compile_call unimplemented"
 
 (* compiling getelementptr (gep)  ------------------------------------------- *)
 
@@ -503,6 +480,34 @@ failwith " unimplemented"
     | LStk of int                 (* a stack offset from %rbp *)
     | LLbl of X86.lbl             (* an assembler label *)
 *)
+
+let cmpl_call (l:Alloc.loc) (t:ty) (op:Alloc.operand) 
+                                    (args:ty * Alloc.operand list) : x86stream =
+  let dest = compile_operand (Alloc.Loc l) in
+  let insns = compile_call op args in (* returns x86stream *)
+  let func_epi = 
+  [ Movq, [Reg Rax; dest]
+  ] in
+  insns @ (lift func_epi)
+
+
+let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
+  begin match i with
+  | Alloc.ILbl -> cmpl_ilbl l
+  | Alloc.Binop (b, t, opr1, opr2) -> lift @@ cmpl_binop l b t opr1 opr2
+  | Alloc.Alloca t -> lift @@ cmpl_alloca l t
+  | Alloc.Load  (t, opr) -> lift @@ cmpl_load l t opr 
+  | Alloc.Store (t, opr1, opr2) -> lift @@ cmpl_store t opr1 opr2 
+  | Alloc.Icmp (llcnd, t, opr1, opr2) -> lift @@ cmpl_icmp l llcnd t opr1 opr2
+  | Alloc.Call (t, opr, args) -> cmpl_call l t opr args 
+  | Alloc.Bitcast (t1, opr, t2) -> lift @@ cmpl_bitcast l t1 opr t2
+  | Alloc.Gep (t, opr1, opr_list) -> [] 
+  | Alloc.Ret (t, opr_option) -> lift @@ cmpl_ret t opr_option
+  | Alloc.Br l -> lift @@ cmpl_br l
+  | Alloc.Cbr (opr, l1, l2) -> lift @@ cmpl_cbr opr l1 l2
+  end
+
+
 
 let compile_body_helper (l: x86stream) 
                                     (el:Alloc.loc * Alloc.insn) : x86stream =
@@ -657,7 +662,5 @@ tdecls name fdecl in  (List.map g gdecls) @ (List.map f fdecls |> List.flatten)
 (*
   TODO:
   
-  Weird things to verify:
-    + Leaq situation vs Movq
 
 *)
