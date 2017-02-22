@@ -278,18 +278,24 @@ let cmpl_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
   ; Movq, [Reg R11; x_op2] 
   ]
 
+
+(* - Br should jump *)
+let cmpl_br (l:Alloc.loc) : X86.ins list =
+  let dest = compile_operand (Alloc.Loc l) in
+  [Jmp, [dest]]
+
 (* - Cbr branch should treat its operand as a boolean conditional 
 *)
 let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
   let x_op = compile_operand op in
   let x_lbl1 = compile_operand (Alloc.Loc l1) in
   let x_lbl2 = compile_operand (Alloc.Loc l2) in
-  (* Printf.printf "x_lbl1 = %s\n" (string_of_operand x_lbl1);
-  Printf.printf "x_lbl2 = %s\n" (string_of_operand x_lbl2); *)
+  Printf.printf "x_lbl1 = %s\n" (string_of_operand x_lbl1);
+  Printf.printf "x_lbl2 = %s\n" (string_of_operand x_lbl2);
   [ Movq, [Imm (Lit 0L); Reg R11]
-  ; Cmpq, [x_op;  Reg R11] 
-  ; J Eq,     [x_lbl1]
-  ; Jmp,      [x_lbl2]
+  ; Cmpq, [Reg R11; x_op] 
+  ; J Eq,     [x_lbl2]
+  ; Jmp,      [x_lbl1]
   ]
 
 (*  - Icmp:  the Set instruction may be of use.  Depending on how you
@@ -299,17 +305,21 @@ let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
 let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand) 
                                         (op2:Alloc.operand) : X86.ins list =
   let cc = cmpl_cnd c in
-  let lo = 
-    begin match l with
-    | Alloc.LStk ls -> compile_operand (Alloc.Loc l)
+  Printf.printf "cnd = %s\n" (string_of_cnd cc);
+  let dest = compile_operand (Alloc.Loc l) in
+    (* begin match l with
+    | Alloc.LStk ls -> 
     | _ -> failwith "can't handle this type here"
-    end in
+    end in *)
+  Printf.printf "cmp = %s\n" (string_of_operand dest);
   let x_op1 = compile_operand op1 in
   let x_op2 = compile_operand op2 in
-  [ Movq, [x_op2; Reg R11]
-  (* ; Movq, [Imm (Lit 0L); lo]  (* zero-init lo *) *)
-  ; Cmpq, [x_op1; Reg R11] 
-  ; Set cc, [lo]
+  Printf.printf "x_op1 = %s x_op2 = %s\n" (string_of_operand x_op1) (string_of_operand x_op2);
+  [ Movq, [x_op1; Reg R10]
+  ; Movq, [x_op2; Reg R11]
+  ; Movq, [Imm (Lit 0L); dest]  (* zero-init dest *)
+  ; Cmpq, [Reg R11; Reg R10] 
+  ; Set cc, [dest]
   ]
 
 
@@ -337,11 +347,6 @@ let cmpl_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
   ; Popq, [Reg Rbp]
   ; Retq, []
   ]
-
-(* - Br should jump *)
-let cmpl_br (l:Alloc.loc) : X86.ins list =
-  let dest = compile_operand (Alloc.Loc l) in
-  [Jmp, [dest]]
 
 
 let cmpl_ilbl l : x86elt list = 
@@ -690,8 +695,9 @@ let count_local_variables (c:Ll.cfg) : int =
   let entry_blk, lbld_blks = c in
   let map, _ = List.fold_left layout_insn_classifier ([], 0) entry_blk.insns in
   let final_map, _ = List.fold_left label_block_helper (map, 0) lbld_blks in
-  let n = List.fold_left count_helper 0 final_map in
-  Printf.printf "Count == %d\n" n; n
+  (* let n =  *)
+  List.fold_left count_helper 0 final_map 
+  (*in  Printf.printf "Count == %d\n" n; n *)
 
 let generate_prologue (f:Ll.fdecl) : X86.ins list = 
   let arg_list = f.param in
