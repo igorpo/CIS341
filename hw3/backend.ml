@@ -327,7 +327,7 @@ let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand)
 let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
   begin match op with
-  | Gid g -> 
+  | Alloc.Gid g -> 
     let x_op = compile_operand_base Rip op in [ Leaq, [x_op; Reg R11]]
   | _ -> let x_op = compile_operand op in [ Movq, [x_op; Reg R11]]
   end 
@@ -434,7 +434,7 @@ let compile_call_helper (i:X86.ins list * int)
   let typ, op = os in 
 
   let arg_ins = begin match op with
-  | Gid g -> let x_op = compile_operand_base Rip op in
+  | Alloc.Gid g -> let x_op = compile_operand_base Rip op in
         [Leaq, [x_op; Reg R10]]
   | _ -> let x_op = compile_operand op in [Movq, [x_op; Reg R10]]
   end in
@@ -539,13 +539,13 @@ let rec size_ty tdecls t : int =
 *)
 
 
-let gep_helper (i:int64) (o:Alloc.operand) : int64 =
+(* let gep_helper (i:int64) (o:Alloc.operand) : int64 =
   begin match o with 
   | Struct st -> 
   | Array (a, t) -> 
   | Namedt t -> 
   end in 
-  i (* we need to return ins list here probably cannot store offset  *)
+  i (* we need to return ins list here probably cannot store offset  *) *)
  
 let compile_getelementptr tdecls (t:Ll.ty) 
                         (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
@@ -598,7 +598,7 @@ let cmpl_call (l:Alloc.loc) (t:ty) (op:Alloc.operand)
                                     (args:(ty * Alloc.operand) list) : x86stream =
   let insns = compile_call op args in
   let pre = begin match l with
-  | LVoid -> []
+  | Alloc.LVoid -> []
   | _ -> 
     let dest = compile_operand (Alloc.Loc l) in 
     lift [ Movq, [Reg Rax; dest]]
