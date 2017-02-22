@@ -393,7 +393,7 @@ let arg_loc_base (n : int) (r: X86.reg) : operand =
   | 3 -> Reg Rcx
   | 4 -> Reg R08
   | 5 -> Reg R09
-  | _ -> Ind3 (Lit (Int64.of_int (8 * (n - 4))), r)
+  | _ -> Ind3 (Lit (Int64.of_int (-8 * (n - 4))), r)
   end
 
 let arg_loc (n : int) : operand = arg_loc_base n Rbp
@@ -619,7 +619,7 @@ let args_helper (m:layout * int) (u: uid) : layout * int =
 let stack_layout (f:Ll.fdecl) : layout =
   let entry_blk, lbld_blks = f.cfg in
   let args_count = List.length f.param in
-  let map_w_args, _ = List.fold_left args_helper ([], 8 * args_count) f.param in
+  let map_w_args, _ = List.fold_left args_helper ([], -8 * args_count) f.param in
   let map_w_locals, c = List.fold_left layout_insn_classifier (map_w_args, -8 * (args_count+1)) entry_blk.insns in
   let final_map, _ = List.fold_left label_block_helper (map_w_locals, c) lbld_blks in
   final_map
