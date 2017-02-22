@@ -307,7 +307,7 @@ let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand)
   let x_op1 = compile_operand op1 in
   let x_op2 = compile_operand op2 in
   [ Movq, [x_op2; Reg R11]
-  ; Movq, [Imm (Lit 0L); lo]  (* zero-init lo *)
+  (* ; Movq, [Imm (Lit 0L); lo]  (* zero-init lo *) *)
   ; Cmpq, [x_op1; Reg R11] 
   ; Set cc, [lo]
   ]
@@ -320,11 +320,6 @@ let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list
   [ Movq, [x_xop; Reg R11]
   ; Movq, [Reg R11; dest]
   ]
-
-let cmpl_gep (t:ty) (op1:Alloc.operand)
-                                     (opl:Alloc.operand list) : X86.ins list =
-  []
-
 (* 
 - Ret should properly exit the function: freeing stack space,
      restoring the value of %rbp, and putting the return value (if
@@ -426,10 +421,9 @@ let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream =
   end in 
   let num_args = Int64.of_int ((8 * List.length os)) in
   let call_ins = 
-    [ Callq, [fn]
-    ; Addq,  [Imm (Lit num_args); Reg Rsp]
-    ] in
-  lift (arg_ins @ call_ins)
+    [ Callq, [fn]] @
+    if num_args > 0L then [Addq, [Imm (Lit num_args); Reg Rsp]] else []
+    in lift (arg_ins @ call_ins)
 
 
 
@@ -489,11 +483,33 @@ let rec size_ty tdecls t : int =
    5. if the index is valid, the remainder of the path is computed as
       in (4), but relative to the type f the sub-element picked out
       by the path so far
+
+
+      | Gep of ty * operand * operand list (* getelementptr ty* %u, i64 %vi, ... *)
 *)
 
+
+let gep_helper (i:int) (o:Alloc.operand) : int =
+  i
+ 
 let compile_getelementptr tdecls (t:Ll.ty) 
                         (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
-failwith " unimplemented"
+  let offset = begin match t with
+  | Ptr p -> 
+    let s = size_ty tdecls p in
+    let base = compile_operand o in
+    List.fold_left gep_helper s os
+  | _ -> failwith "not a pointer"
+  end in
+  lift [Movq, [Imm (Lit (Int64.of_int offset)); Reg R11]]
+
+
+
+let cmpl_gep tdecls (l:Alloc.loc) (t:ty) (op1:Alloc.operand)
+                                     (opl:Alloc.operand list) : x86stream =
+  let ins = compile_getelementptr tdecls t op1 opl in
+  let dest = compile_operand (Alloc.Loc l) in
+  ins @ lift ([Movq, [Reg R11; dest]])
 
 (* compiling instructions within function bodies ---------------------------- *)
 
@@ -541,7 +557,7 @@ let cmpl_call (l:Alloc.loc) (t:ty) (op:Alloc.operand)
   (lift fn) @ insns
 
 
-let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
+let compile_insn tdecls (l:Alloc.loc) (i:Alloc.insn) : x86stream =
   begin match i with
   | Alloc.ILbl -> cmpl_ilbl l
   | Alloc.Binop (b, t, opr1, opr2) -> lift @@ cmpl_binop l b t opr1 opr2
@@ -551,7 +567,7 @@ let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
   | Alloc.Icmp (llcnd, t, opr1, opr2) -> lift @@ cmpl_icmp l llcnd t opr1 opr2
   | Alloc.Call (t, opr, args) -> cmpl_call l t opr args 
   | Alloc.Bitcast (t1, opr, t2) -> lift @@ cmpl_bitcast l t1 opr t2
-  | Alloc.Gep (t, opr1, opr_list) -> [] 
+  | Alloc.Gep (t, opr1, opr_list) -> cmpl_gep tdecls l t opr1 opr_list
   | Alloc.Ret (t, opr_option) -> lift @@ cmpl_ret t opr_option
   | Alloc.Br l -> lift @@ cmpl_br l
   | Alloc.Cbr (opr, l1, l2) -> lift @@ cmpl_cbr opr l1 l2
@@ -559,13 +575,14 @@ let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
 
 
 
-let compile_body_helper (l: x86stream) 
-                                    (el:Alloc.loc * Alloc.insn) : x86stream =
+let compile_body_helper (l: x86stream * (tid * ty) list)
+                                    (el:Alloc.loc * Alloc.insn) : (x86stream * ((tid * ty) list)) =
+  let _l, tdecls = l in
   let lo, li = el in
-  compile_insn lo li @ l 
+  (compile_insn tdecls lo li @ _l, tdecls)
 
 let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
-  let insn = List.fold_left compile_body_helper [] af in
+  let insn, _ = List.fold_left compile_body_helper ([],tdecls) af in
   insn
 
 (* compile_fdecl ------------------------------------------------------------ *)
@@ -592,23 +609,24 @@ let layout_insn_classifier (m:layout * int) (l:uid * insn) : layout * int =
   begin match i with
   | Store (x,_,_) -> 
     begin match x with
-    | Void -> (map @ [(u, Alloc.LVoid)], new_count)
-    | _ -> (map @ [(u, Alloc.LStk count)], new_count)
+    | _ -> (map @ [(u, Alloc.LVoid)], count)
+    (* | _ -> (map @ [(u, Alloc.LStk count)], new_count) *)
     end
   | Call (x,_,_) -> 
     begin match x with
-    | Void -> (map @ [(u, Alloc.LVoid)], new_count)
+    | Void -> (map @ [(u, Alloc.LVoid)], count)
     | _ -> (map @ [(u, Alloc.LStk count)], new_count)
     end
+  
+  (* | Alloca _ -> (map, count) *)
   | _ -> (map @ [(u, Alloc.LStk count)], new_count)
   end
 
 let label_block_helper (m:layout * int) (b:lbl * block) : layout * int =
   let map, count = m in
-  let new_count = count - 8 in
   let label, blk = b in
   List.fold_left layout_insn_classifier 
-                      (map @ [(label, Alloc.LLbl label)], new_count) blk.insns
+                      (map @ [(label, Alloc.LLbl label)], count) blk.insns
 
 let args_helper (u: uid) (m:layout * int * int) : layout * int * int =
   let map, count, arg_count = m in
@@ -658,9 +676,9 @@ let gen_push_args_to_stack (arg_list:uid list) : X86.ins list =
 
 
 let count_helper (c:int) (el:uid * Alloc.loc) : int =
-  let _, l = el in
+  let u, l = el in
   begin match l with
-  | Alloc.LStk s -> c + 1
+  | Alloc.LStk s -> (* Printf.printf "counting this %s %d \n" u (c+1); *) c + 1
   | _ -> c
   end
 
@@ -681,7 +699,9 @@ let generate_prologue (f:Ll.fdecl) : X86.ins list =
   [ Pushq,  [Reg Rbp]
   ; Movq,  [Reg Rsp; Reg Rbp]
   ] @ gen_push_args_to_stack arg_list
-  @ [Subq, [Imm (Lit (Int64.of_int (8 * (num_vars)))); Reg Rsp]]
+  @ if num_vars > 0 then
+    [Subq, [Imm (Lit (Int64.of_int (8 * (num_vars)))); Reg Rsp]]
+  else []
 
 let generate_epilogue (l:layout) : X86.ins list = 
   [] (* TODO: subtract from Rsp *)

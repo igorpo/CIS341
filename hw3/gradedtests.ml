@@ -73,7 +73,7 @@ let c_link_test c_files path args =
 
 let executed tests =
   List.map (fun (fn, ans) ->
-      (* Printf.printf "Got %Ld\n" (exec_e2e_file fn ""); *)
+      (* Printf.printf "Got %Ld, supposed to be %Ld\n" (exec_e2e_file fn "") ans; *)
       fn, assert_eqf (fun () -> exec_e2e_file fn "") ans)
     tests
 
@@ -160,7 +160,7 @@ let hidden_tests =
 let hidden_large_tests =
   []
 
-let large_tests = [ "llprograms/list1.ll", 3L
+let large_tests = [ "llprograms/list1.ll", 3L 
                   ; "llprograms/cbr.ll", 42L
                   ; "llprograms/factorial.ll", 120L
                   ; "llprograms/factrect.ll", 120L
@@ -174,7 +174,7 @@ let tests : suite =
   ; GradedTest("memory tests", 10, executed memory_tests)      
   ; GradedTest("calling convention tests", 10, executed calling_convention_tests)
   ; GradedTest("bitcast tests", 2, executed bitcast_tests)
-  ; GradedTest("gep tests", 10, executed gep_tests)
+  ; GradedTest("gep tests", 10, executed gep_tests) 
   ; GradedTest("large tests", 5, executed large_tests)
   ; GradedTest("hidden tests", 5, hidden_tests)
   ; GradedTest("hidden large tests", 13, hidden_large_tests)
