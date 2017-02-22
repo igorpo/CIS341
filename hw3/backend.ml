@@ -665,9 +665,14 @@ let count_helper (c:int) (el:uid * Alloc.loc) : int =
   end
 
 let count_local_variables (c:Ll.cfg) : int = 
-  let entry_blk, lbld_blks = f.cfg in
-  
-  let n = List.fold_left count_helper 0 l in
+  (* 
+    type block = { 
+      insns: (uid * insn) list; terminator: terminator }
+   *)
+  let entry_blk, lbld_blks = c in
+  let map, _ = List.fold_left layout_insn_classifier ([], 0) entry_blk.insns in
+  let final_map, _ = List.fold_left label_block_helper (map, 0) lbld_blks in
+  let n = List.fold_left count_helper 0 final_map in
   Printf.printf "Count == %d\n" n; n
 
 let generate_prologue (f:Ll.fdecl) : X86.ins list = 
@@ -675,8 +680,8 @@ let generate_prologue (f:Ll.fdecl) : X86.ins list =
   let num_vars = count_local_variables f.cfg in
   [ Pushq,  [Reg Rbp]
   ; Movq,  [Reg Rsp; Reg Rbp]
-  ; Subq, [Imm (Lit (Int64.of_int (8 * num_vars))); Reg Rsp]
   ] @ gen_push_args_to_stack arg_list
+  @ [Subq, [Imm (Lit (Int64.of_int (8 * (num_vars)))); Reg Rsp]]
 
 let generate_epilogue (l:layout) : X86.ins list = 
   [] (* TODO: subtract from Rsp *)
