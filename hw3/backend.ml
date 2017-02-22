@@ -290,8 +290,8 @@ let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
   let x_op = compile_operand op in
   let x_lbl1 = compile_operand (Alloc.Loc l1) in
   let x_lbl2 = compile_operand (Alloc.Loc l2) in
-  Printf.printf "x_lbl1 = %s\n" (string_of_operand x_lbl1);
-  Printf.printf "x_lbl2 = %s\n" (string_of_operand x_lbl2);
+  (* Printf.printf "x_lbl1 = %s\n" (string_of_operand x_lbl1);
+  Printf.printf "x_lbl2 = %s\n" (string_of_operand x_lbl2); *)
   [ Movq, [Imm (Lit 0L); Reg R11]
   ; Cmpq, [Reg R11; x_op] 
   ; J Eq,     [x_lbl2]
@@ -305,31 +305,34 @@ let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
 let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand) 
                                         (op2:Alloc.operand) : X86.ins list =
   let cc = cmpl_cnd c in
-  Printf.printf "cnd = %s\n" (string_of_cnd cc);
+  (* Printf.printf "cnd = %s\n" (string_of_cnd cc); *)
   let dest = compile_operand (Alloc.Loc l) in
     (* begin match l with
     | Alloc.LStk ls -> 
     | _ -> failwith "can't handle this type here"
     end in *)
-  Printf.printf "cmp = %s\n" (string_of_operand dest);
+  (* Printf.printf "cmp = %s\n" (string_of_operand dest); *)
   let x_op1 = compile_operand op1 in
   let x_op2 = compile_operand op2 in
-  Printf.printf "x_op1 = %s x_op2 = %s\n" (string_of_operand x_op1) (string_of_operand x_op2);
+  (* Printf.printf "x_op1 = %s x_op2 = %s\n" (string_of_operand x_op1) (string_of_operand x_op2); *)
   [ Movq, [x_op1; Reg R10]
   ; Movq, [x_op2; Reg R11]
   ; Movq, [Imm (Lit 0L); dest]  (* zero-init dest *)
   ; Cmpq, [Reg R11; Reg R10] 
   ; Set cc, [dest]
-  ]
+  ] 
 
 
 (* - Bitcast: does nothing interesting at the assembly level *)
 let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
-  let x_xop = compile_operand op in
-  [ Movq, [x_xop; Reg R11]
-  ; Movq, [Reg R11; dest]
-  ]
+  begin match op with
+  | Gid g -> 
+    let x_op = compile_operand_base Rip op in [ Leaq, [x_op; Reg R11]]
+  | _ -> let x_op = compile_operand op in [ Movq, [x_op; Reg R11]]
+  end 
+  @
+  [Movq, [Reg R11; dest]]
 (* 
 - Ret should properly exit the function: freeing stack space,
      restoring the value of %rbp, and putting the return value (if
@@ -400,21 +403,63 @@ let arg_loc_base (n : int) (r: X86.reg) : operand =
 let arg_loc (n : int) : operand = arg_loc_base n Rbp
   
 
-let compile_call_helper (i:X86.ins list * int) (os:ty * Alloc.operand) : X86.ins list * int =
+  (*
+    Fun of fty
+    fty = ty list * ty
+  *)
+
+let compile_func_arg (os:ty * Alloc.operand) : X86.operand =
+  let t, op = os in
+  begin match op with 
+    | Alloc.Gid g -> Imm (Lbl g)
+    | _ -> compile_operand op
+  end
+ (*  begin match t with
+  | Ptr p ->
+      begin match op with 
+      | Gid g -> Imm (Lbl g)
+      | Loc lo -> 
+        begin match lo with
+        | LLbl l -> Imm (Lbl l)
+        | _ -> failwith "nah"
+        end
+      | _ -> Printf.printf "Wrong type %s\n" (string_of_operand (compile_operand op));failwith "wrong type"
+      end
+  | _ -> compile_operand op
+  end *)
+
+let compile_call_helper (i:X86.ins list * int) 
+                        (os:ty * Alloc.operand) : X86.ins list * int =
   let ins, count = i in
-  let _, op = os in
-  let x_op = compile_operand op in
+  let typ, op = os in 
+
+  let arg_ins = begin match op with
+  | Gid g -> let x_op = compile_operand_base Rip op in
+        [Leaq, [x_op; Reg R10]]
+  | _ -> let x_op = compile_operand op in [Movq, [x_op; Reg R10]]
+  end in
+
+
+  (* let arg_ins = begin match typ with
+    | Ptr p -> 
+      begin match p with
+      | Fun fn -> 
+        let x_op = compile_operand_base Rip op in
+        [Leaq, [x_op; Reg R10]]
+      | _ -> let x_op = compile_operand op in [Movq, [x_op; Reg R10]]
+      end
+    | _ -> let x_op = compile_operand op in [Movq, [x_op; Reg R10]]
+  end in *)
   (* Printf.printf "Operand: %s\n" (string_of_operand x_op); *)
   let dest = arg_loc count in
   let new_ins = 
     if count < 6 then
-      [ Movq, [x_op; Reg R10]
-      ; Movq, [Reg R10; dest]
+      [ Movq, [Reg R10; dest]
       ] 
     else
-      [ Pushq, [x_op]]
+      [ Pushq, [Reg R10]]
     in
-  (ins @ new_ins, count + 1)
+  (ins @ arg_ins @ new_ins, count + 1)
 
 
 
@@ -499,14 +544,15 @@ let gep_helper (i:int) (o:Alloc.operand) : int =
  
 let compile_getelementptr tdecls (t:Ll.ty) 
                         (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
-  let offset = begin match t with
+  []
+  (* let offset = begin match t with
   | Ptr p -> 
     let s = size_ty tdecls p in
     let base = compile_operand o in
     List.fold_left gep_helper s os
   | _ -> failwith "not a pointer"
   end in
-  lift [Movq, [Imm (Lit (Int64.of_int offset)); Reg R11]]
+  lift [Movq, [Imm (Lit (Int64.of_int offset)); Reg R11]] *)
 
 
 
@@ -553,13 +599,17 @@ let cmpl_gep tdecls (l:Alloc.loc) (t:ty) (op1:Alloc.operand)
 
 let cmpl_call (l:Alloc.loc) (t:ty) (op:Alloc.operand) 
                                     (args:(ty * Alloc.operand) list) : x86stream =
-  let dest = compile_operand (Alloc.Loc l) in
+  let insns = compile_call op args in
+  let pre = begin match l with
+  | LVoid -> []
+  | _ -> 
+    let dest = compile_operand (Alloc.Loc l) in 
+    lift [ Movq, [Reg Rax; dest]]
+  end
+   in
+  pre @ insns
   
-  let insns = compile_call op args in (* returns x86stream *)
-  let fn = 
-  [ Movq, [Reg Rax; dest]
-  ] in
-  (lift fn) @ insns
+  
 
 
 let compile_insn tdecls (l:Alloc.loc) (i:Alloc.insn) : x86stream =
