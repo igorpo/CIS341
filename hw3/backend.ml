@@ -72,14 +72,15 @@ type fbody = (loc * insn) list
    two functions
    f : uid -> loc
    g : gid -> X86.lbl *)
-let map_operand f g : Ll.operand -> operand = function
-  | Null -> Null
-  | Const i -> Const i
-  | Gid x -> Gid (g x)
-  | Id u -> Loc (f u)
+let map_operand f g : Ll.operand -> operand = (* Printf.printf "map_operand\n"; *) function
+  | Null -> (* Printf.printf "Null\n";   *)Null
+  | Const i -> (* Printf.printf "Const\n"; *) Const i
+  | Gid x -> (* Printf.printf "Gid\n"; *) Gid (g x)
+  | Id u -> (* Printf.printf "Id %s\n" *) Loc (f u)
 
 let map_insn f g : Ll.insn -> insn = 
-  let mo = map_operand f g in function
+  let mo = map_operand f g in 
+  (* Printf.printf "map_insn\n"; *) function
   | Binop (b,t,o,o') -> Binop (b,t,mo o,mo o')
   | Alloca t         -> Alloca t
   | Load (t,o)       -> Load (t,mo o)
@@ -90,15 +91,16 @@ let map_insn f g : Ll.insn -> insn =
   | Gep (t,o,is)     -> Gep (t,mo o,List.map mo is)
 
 let map_terminator f g : Ll.terminator -> insn = 
-  let mo = map_operand f g in function
+  let mo = map_operand f g in (* Printf.printf "map_terminator\n";  *)function
   | Ret (t,None)   -> Ret (t, None)
   | Ret (t,Some o) -> Ret (t, Some (mo o))
   | Br l           -> Br (f l)
   | Cbr (o,l,l')   -> Cbr (mo o,f l,f l')
 
 let of_block f g (b:Ll.block) : fbody =
-  List.map (fun (u,i) -> f u, map_insn f g i) b.insns
-  @ [LVoid, map_terminator f g b.terminator]
+  let b = List.map (fun (u,i) -> f u, map_insn f g i) b.insns
+  @ [LVoid, map_terminator f g b.terminator] in
+  (* Printf.printf "Called this"; *) b
                                 
 let of_lbl_block f g (l,b:Ll.lbl * Ll.block) : fbody =
   (LLbl (Platform.mangle l), ILbl)::of_block f g b
@@ -141,7 +143,7 @@ type layout = (uid * Alloc.loc) list
 (* Once we have a layout, it's simple to generate the allocated version of our
    LLVMlite program *)
 let alloc_cfg (layout:layout) (g:Ll.cfg) : Alloc.fbody =
-  Alloc.of_cfg (fun x -> List.assoc x layout) 
+  Alloc.of_cfg (fun x -> (* Printf.printf "Layout\n";  *)List.assoc x layout) 
                (fun l -> Platform.mangle l) g
 
 (* streams of x86 instructions ---------------------------------------------- *)
@@ -375,12 +377,60 @@ let cmpl_ilbl l : x86elt list =
 *)
 
 
+(* This helper function computes the location of the nth incoming
+   function argument: either in a register or relative to %rbp,
+   according to the calling conventions.  You might find it useful for
+   compile_fdecl.
+
+   [ NOTE: the first six arguments are numbered 0 .. 5 ]
+*)
+
+let arg_loc_base (n : int) (r: X86.reg) : operand = 
+  begin match n with
+  | 0 -> Reg Rdi
+  | 1 -> Reg Rsi
+  | 2 -> Reg Rdx
+  | 3 -> Reg Rcx
+  | 4 -> Reg R08
+  | 5 -> Reg R09
+  | _ -> Ind3 (Lit (Int64.of_int (8 * (n - 4))), r)
+  end
+
+let arg_loc (n : int) : operand = arg_loc_base n Rbp
+  
+
+
+
 let compile_call_helper (i:X86.ins list * int) (os:ty * Alloc.operand) : X86.ins list * int =
   let ins, count = i in
-  let _, op 
+  let _, op = os in
+  let x_op = compile_operand op in
+  (* Printf.printf "Operand: %s\n" (string_of_operand x_op); *)
+  let dest = arg_loc_base count Rsp in
+  let new_ins = 
+    if count < 6 then
+      [ Movq, [x_op; Reg R10]
+      ; Movq, [Reg R10; dest]
+      ] 
+    else
+      [ Pushq, [x_op]]
+    in
+  (ins @ new_ins, count + 1)
+
+
 
 let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream = 
-  let ins, _, _ = List.fold_left compile_call_helper ([], 0) os
+  let arg_ins, _ = List.fold_left compile_call_helper ([], 0) os in
+  let fn = begin match fo with 
+    | Alloc.Gid g -> Imm (Lbl g)
+    | _ -> failwith "wrong type"
+  end in 
+  let num_args = Int64.of_int ((8 * List.length os)) in
+  let call_ins = 
+    [ Callq, [fn]
+    ; Addq,  [Imm (Lit num_args); Reg Rsp]
+    ] in
+  lift (arg_ins @ call_ins)
 
 
 
@@ -482,13 +532,14 @@ failwith " unimplemented"
 *)
 
 let cmpl_call (l:Alloc.loc) (t:ty) (op:Alloc.operand) 
-                                    (args:ty * Alloc.operand list) : x86stream =
+                                    (args:(ty * Alloc.operand) list) : x86stream =
   let dest = compile_operand (Alloc.Loc l) in
+  
   let insns = compile_call op args in (* returns x86stream *)
-  let func_epi = 
+  let fn = 
   [ Movq, [Reg Rax; dest]
   ] in
-  insns @ (lift func_epi)
+  (lift fn) @ insns
 
 
 let compile_insn (l:Alloc.loc) (i:Alloc.insn) : x86stream =
@@ -560,13 +611,18 @@ let label_block_helper (m:layout * int) (b:lbl * block) : layout * int =
   List.fold_left layout_insn_classifier 
                       (map @ [(label, Alloc.LLbl label)], new_count) blk.insns
 
+let args_helper (m:layout * int) (u: uid) : layout * int =
+  let map, count = m in
+  let new_count = count + 8 in
+  (map @ [(u, Alloc.LStk count)], new_count)
+
 let stack_layout (f:Ll.fdecl) : layout =
-  let entry_blk, lbld_blks = f.cfg in 
-  let map, c = List.fold_left layout_insn_classifier ([], -8) entry_blk.insns in
-  let new_map, _ = List.fold_left label_block_helper (map, c) lbld_blks in
-  new_map
-
-
+  let entry_blk, lbld_blks = f.cfg in
+  let args_count = List.length f.param in
+  let map_w_args, _ = List.fold_left args_helper ([], 8 * args_count) f.param in
+  let map_w_locals, c = List.fold_left layout_insn_classifier (map_w_args, -8 * (args_count+1)) entry_blk.insns in
+  let final_map, _ = List.fold_left label_block_helper (map_w_locals, c) lbld_blks in
+  final_map
 
 (* The code for the entry-point of a function must do several things:
 
@@ -587,29 +643,11 @@ let stack_layout (f:Ll.fdecl) : layout =
      to hold all of the local stack slots.
 *)
 
-(* This helper function computes the location of the nth incoming
-   function argument: either in a register or relative to %rbp,
-   according to the calling conventions.  You might find it useful for
-   compile_fdecl.
-
-   [ NOTE: the first six arguments are numbered 0 .. 5 ]
-*)
-let arg_loc (n : int) : operand =
-  begin match n with
-  | 0 -> Reg Rdi
-  | 1 -> Reg Rsi
-  | 2 -> Reg Rdx
-  | 3 -> Reg Rcx
-  | 4 -> Reg R08
-  | 5 -> Reg R09
-  | _ -> Ind3 (Lit (Int64.of_int (8*(n-4))), Rbp)
-  end
-
 let push_helper (l:X86.ins list * int) (u:uid)  : (X86.ins list * int) =
   let insns, count = l in
-  let new_ins = if count < 6 then
+  let new_ins = (* if count < 6 then *)
     [(Pushq, [arg_loc count])]
-  else [] in
+  (* else []  *)in
   (new_ins @ insns, count + 1)
 
 let gen_push_args_to_stack (arg_list:uid list) : X86.ins list =
@@ -649,8 +687,10 @@ and compile_gdecl (_, g) = compile_ginit g
 (* compile_prog ------------------------------------------------------------- *)
 
 let compile_prog {tdecls; gdecls; fdecls} : X86.prog =
+
   let g = fun (lbl, gdecl) -> Asm.data (Platform.mangle lbl) 
                                                     (compile_gdecl gdecl) in
+  
   let f = fun (name, fdecl) -> prog_of_x86stream @@ compile_fdecl 
 tdecls name fdecl in  (List.map g gdecls) @ (List.map f fdecls |> List.flatten)
 
