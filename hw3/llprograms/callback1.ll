@@ -1,4 +1,7 @@
 %fty = type i64 (i64, i64)
+declare i64 @ll_callback(%fty*)
+declare i8* @ll_ltoa(i64)
+declare void @ll_puts(i8*)
 
 define i64 @foo(i64 %x, i64 %y) {
   %1 = alloca i64

@@ -1,14 +1,26 @@
-define i64 @baz(i64 %x1, i64 %x2) {
-  %1 = add i64 %x1, %x2
-  ret i64 %1
-}
+%fty = type i64 (i64, i64)
 
-define i64 @main(i64 %argc, i8** %arcv) {
-  %1 = add i64 1, 1
-  %2 = add i64 %1, 1
-  %tmp = call i64 @baz(i64 %1, i64 %2)
-  %3 = add i64 %2, %tmp
+declare i64 @ll_callback(%fty*)
+declare i8* @ll_ltoa(i64)
+declare void @ll_puts(i8*)
+
+define i64 @foo(i64 %x, i64 %y) {
+  %1 = alloca i64
+  %2 = add i64 %x, %y
+  store i64 %2, i64* %1
+  %3 = load i64, i64* %1
   ret i64 %3
 }
 
+define i8 @boo(i64 %x) {
+  ret i64 %x
+}
+
+
+define i64 @main(i64 %argc, i8** %argv) {
+  %1 = call i64 @ll_callback(%fty* @foo)
+  %2 = call i8* @ll_ltoa(i64 %1)
+  call void @ll_puts(i8* %2)
+  ret i64 0
+}
 

@@ -79,6 +79,10 @@ let executed tests =
 
 let executed_io tests =
   List.map (fun (fn, args, ans) ->
+    (* Printf.printf "Calling %s\n" fn;
+    Printf.printf "With args: %s\n" (String.concat " " args);
+    Printf.printf "Got result: %s\n" (io_test fn args);
+    Printf.printf "Expected: %s\n" ans; *)
       (fn ^ ":" ^ (String.concat " " args)), assert_eqf (fun () -> io_test fn args) ans)
     tests
 
@@ -136,16 +140,16 @@ let gep_tests =
   ; "llprograms/gep5.ll", 4L
   ; "llprograms/gep6.ll", 7L
   ; "llprograms/gep7.ll", 7L    
-  ; "llprograms/gep8.ll", 2L    
+  ; "llprograms/gep8.ll", 2L
   ]
 
 let io_tests =
   [ "llprograms/helloworld.ll", [], "hello, world!"
-  ; "llprograms/string1.ll", [], "hello, world!hello, world!"
+  ; "llprograms/string1.ll", [], "hello, world!hello, world!" 
   ; "llprograms/callback1.ll", [], "38"
   ; "llprograms/args1.ll", ["hello"], "argc < 3"    
   ; "llprograms/args1.ll", ["hello"; "cis341"], "hellocis341"
-  ; "llprograms/args1.ll", ["hello"; "cis341"; "foo"], "argc > 3"    
+  ; "llprograms/args1.ll", ["hello"; "cis341"; "foo"], "argc > 3"   
   ]
 
 
@@ -175,7 +179,7 @@ let tests : suite =
   ; GradedTest("calling convention tests", 10, executed calling_convention_tests)
   ; GradedTest("bitcast tests", 2, executed bitcast_tests)
   ; GradedTest("gep tests", 10, executed gep_tests)
-  ;  GradedTest("large tests", 5, executed large_tests)
+  ; GradedTest("large tests", 5, executed large_tests)
   ; GradedTest("hidden tests", 5, hidden_tests)
   ; GradedTest("hidden large tests", 13, hidden_large_tests)
   ; GradedTest("io tests", 10, executed_io io_tests)
