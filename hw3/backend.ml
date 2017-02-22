@@ -236,7 +236,8 @@ let cmpl_cnd : Ll.cnd -> X86.cnd = function
 (* - Alloca: needs to return a pointer into the stack *)
 let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
   (* let dest = compile_operand (Alloc.Loc l) in *)
-  [Subq, [Imm (Lit 8L); Reg Rsp]]
+  (* [Subq, [Imm (Lit 8L); Reg Rsp]] *)
+  []
   (* 
     Rsp -> R11
 
@@ -393,20 +394,18 @@ let arg_loc_base (n : int) (r: X86.reg) : operand =
   | 3 -> Reg Rcx
   | 4 -> Reg R08
   | 5 -> Reg R09
-  | _ -> Ind3 (Lit (Int64.of_int (-8 * (n - 4))), r)
+  | _ -> Ind3 (Lit (Int64.of_int (8 * (n-4))), r)
   end
 
 let arg_loc (n : int) : operand = arg_loc_base n Rbp
   
-
-
 
 let compile_call_helper (i:X86.ins list * int) (os:ty * Alloc.operand) : X86.ins list * int =
   let ins, count = i in
   let _, op = os in
   let x_op = compile_operand op in
   (* Printf.printf "Operand: %s\n" (string_of_operand x_op); *)
-  let dest = arg_loc_base count Rsp in
+  let dest = arg_loc count in
   let new_ins = 
     if count < 6 then
       [ Movq, [x_op; Reg R10]
@@ -611,15 +610,18 @@ let label_block_helper (m:layout * int) (b:lbl * block) : layout * int =
   List.fold_left layout_insn_classifier 
                       (map @ [(label, Alloc.LLbl label)], new_count) blk.insns
 
-let args_helper (m:layout * int) (u: uid) : layout * int =
-  let map, count = m in
-  let new_count = count + 8 in
-  (map @ [(u, Alloc.LStk count)], new_count)
-
+let args_helper (u: uid) (m:layout * int * int) : layout * int * int =
+  let map, count, arg_count = m in
+  if count > 6 then 
+    (map @ [(u, Alloc.LStk (8 * (count - 5)))], count - 1, arg_count)  
+  else (* first 6 args *)
+    let mul = (-8 * (arg_count - count + 1)) in
+    (map @ [(u, Alloc.LStk mul)], count - 1, arg_count)
+      
 let stack_layout (f:Ll.fdecl) : layout =
   let entry_blk, lbld_blks = f.cfg in
   let args_count = List.length f.param in
-  let map_w_args, _ = List.fold_left args_helper ([], -8 * args_count) f.param in
+  let map_w_args, _, _ = List.fold_right args_helper f.param ([], args_count, args_count) in
   let map_w_locals, c = List.fold_left layout_insn_classifier (map_w_args, -8 * (args_count+1)) entry_blk.insns in
   let final_map, _ = List.fold_left label_block_helper (map_w_locals, c) lbld_blks in
   final_map
@@ -646,7 +648,7 @@ let stack_layout (f:Ll.fdecl) : layout =
 let push_helper (l:X86.ins list * int) (u:uid)  : (X86.ins list * int) =
   let insns, count = l in
   let new_ins = (* if count < 6 then *)
-    [(Pushq, [arg_loc count])]
+    [(Pushq, [arg_loc_base count Rbp])]
   (* else []  *)in
   (new_ins @ insns, count + 1)
 
@@ -654,16 +656,34 @@ let gen_push_args_to_stack (arg_list:uid list) : X86.ins list =
   let push_insns, _ = List.fold_left push_helper ([],0) arg_list in
   push_insns
 
-let generate_prologue (arg_list:uid list) : X86.ins list = 
-  [ (Pushq,  [Reg Rbp])
-  ; (Movq,  [Reg Rsp; Reg Rbp])] @ gen_push_args_to_stack arg_list
+
+let count_helper (c:int) (el:uid * Alloc.loc) : int =
+  let _, l = el in
+  begin match l with
+  | Alloc.LStk s -> c + 1
+  | _ -> c
+  end
+
+let count_local_variables (c:Ll.cfg) : int = 
+  let entry_blk, lbld_blks = f.cfg in
+  
+  let n = List.fold_left count_helper 0 l in
+  Printf.printf "Count == %d\n" n; n
+
+let generate_prologue (f:Ll.fdecl) : X86.ins list = 
+  let arg_list = f.param in
+  let num_vars = count_local_variables f.cfg in
+  [ Pushq,  [Reg Rbp]
+  ; Movq,  [Reg Rsp; Reg Rbp]
+  ; Subq, [Imm (Lit (Int64.of_int (8 * num_vars))); Reg Rsp]
+  ] @ gen_push_args_to_stack arg_list
 
 let generate_epilogue (l:layout) : X86.ins list = 
   [] (* TODO: subtract from Rsp *)
 
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let l = stack_layout f in
-  let prologue = generate_prologue f.param in
+  let prologue = generate_prologue f in
   let fbody = alloc_cfg l f.cfg in
   let body_insn = compile_fbody tdecls fbody in
   let epilogue = generate_epilogue l in
