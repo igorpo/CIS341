@@ -101,12 +101,12 @@ let binop_tests =
 let calling_convention_tests =
   [ "llprograms/call.ll", 42L
   ; "llprograms/call1.ll", 17L  
-  ;  "llprograms/call2.ll", 19L
-   ;"llprograms/call3.ll", 34L
+  ; "llprograms/call2.ll", 19L
+  ; "llprograms/call3.ll", 34L
   ; "llprograms/call4.ll", 34L
   ; "llprograms/call5.ll", 24L
   ; "llprograms/call6.ll", 26L
-  (* ;"llprograms/ourtest.ll", 0L  *)
+  (* ; "llprograms/ourtest.ll", 0L *)
   ]
 
 let memory_tests =
@@ -119,9 +119,9 @@ let terminator_tests =
   [ "llprograms/return.ll", 0L
   ; "llprograms/return42.ll", 42L
   ; "llprograms/br1.ll", 9L
-  ; "llprograms/br2.ll", 17L    
+  ; "llprograms/br2.ll", 17L     
   ; "llprograms/cbr1.ll", 7L
-  ; "llprograms/cbr2.ll", 9L    
+  ; "llprograms/cbr2.ll", 9L
   ]
 
 let bitcast_tests =
@@ -174,20 +174,20 @@ let tests : suite =
   ; GradedTest("memory tests", 10, executed memory_tests)      
   ; GradedTest("calling convention tests", 10, executed calling_convention_tests)
   ; GradedTest("bitcast tests", 2, executed bitcast_tests)
-  ; GradedTest("gep tests", 10, executed gep_tests) 
-  ; GradedTest("large tests", 5, executed large_tests)
+  ; GradedTest("gep tests", 10, executed gep_tests)
+  ;  GradedTest("large tests", 5, executed large_tests)
   ; GradedTest("hidden tests", 5, hidden_tests)
   ; GradedTest("hidden large tests", 13, hidden_large_tests)
   ; GradedTest("io tests", 10, executed_io io_tests)
   ]
 
 let manual_tests : suite = [
-  (* GradedTest ("Posted Piazza Test Case", 5,
+  GradedTest ("Posted Piazza Test Case", 5,
               [("manually", assert_eq true false)]
              );
   GradedTest ("Other Student Piazza Tests", 5,
               [("manually", assert_eq true false)]
-             ); *)
+             );
 ]
 
 let graded_tests : suite =
