@@ -494,19 +494,31 @@ let rec size_ty tdecls t : int =
 *)
 
 
-let gep_helper (i:int) (o:Alloc.operand) : int =
-  i
+let gep_helper (i:int64) (o:Alloc.operand) : int64 =
+  begin match o with 
+  | Struct st -> 
+  | Array (a, t) -> 
+  | Namedt t -> 
+  end in 
+  i (* we need to return ins list here probably cannot store offset  *)
  
 let compile_getelementptr tdecls (t:Ll.ty) 
                         (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
-  let offset = begin match t with
+  let offset = 
+  begin match t with
   | Ptr p -> 
-    let s = size_ty tdecls p in
+    let s = Int64.of_int(size_ty tdecls p) in
     let base = compile_operand o in
-    List.fold_left gep_helper s os
+    begin match os with 
+    | h::tl -> 
+      let fst_idx = Int64.mul (compile_operand h) s in
+      let lst_res = List.fold_left gep_helper s tl in
+      Int64.add base (Int64.add fst_idx lst_res)
+    | [] -> Int64.zero
+    end
   | _ -> failwith "not a pointer"
   end in
-  lift [Movq, [Imm (Lit (Int64.of_int offset)); Reg R11]]
+  lift [Movq, [Imm (Lit offset); Reg R11]]
 
 
 
