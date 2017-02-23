@@ -73,7 +73,7 @@ let c_link_test c_files path args =
 
 let executed tests =
   List.map (fun (fn, ans) ->
-      (* Printf.printf "Got %Ld, supposed to be %Ld\n" (exec_e2e_file fn "") ans; *)
+      Printf.printf "Got %Ld, supposed to be %Ld\n" (exec_e2e_file fn "") ans; 
       fn, assert_eqf (fun () -> exec_e2e_file fn "") ans)
     tests
 
@@ -133,14 +133,14 @@ let bitcast_tests =
   ]
 
 let gep_tests =
-  [ "llprograms/gep1.ll", 6L
-  ; "llprograms/gep2.ll", 4L
-  ; "llprograms/gep3.ll", 1L
+  [ (* "llprograms/gep1.ll", 6L
+  ; *) "llprograms/gep2.ll", 4L
+  (* ; "llprograms/gep3.ll", 1L
   ; "llprograms/gep4.ll", 2L
   ; "llprograms/gep5.ll", 4L
   ; "llprograms/gep6.ll", 7L
   ; "llprograms/gep7.ll", 7L    
-  ; "llprograms/gep8.ll", 2L
+  ; "llprograms/gep8.ll", 2L *)
   ]
 
 let io_tests =
@@ -171,27 +171,27 @@ let large_tests = [ "llprograms/list1.ll", 3L
                   ]
 
 let tests : suite =
-  [ GradedTest("size_ty tests", 5, size_ty_tests)
+  [ (* GradedTest("size_ty tests", 5, size_ty_tests)
   ; GradedTest("arg_loc tests", 5, arg_loc_tests)
   ; GradedTest("executed binop tests", 5, executed binop_tests)
   ; GradedTest("terminator tests", 10, executed terminator_tests)
   ; GradedTest("memory tests", 10, executed memory_tests)      
   ; GradedTest("calling convention tests", 10, executed calling_convention_tests)
   ; GradedTest("bitcast tests", 2, executed bitcast_tests)
-  ; GradedTest("gep tests", 10, executed gep_tests)
-  ; GradedTest("large tests", 5, executed large_tests)
+  ; *) GradedTest("gep tests", 10, executed gep_tests)
+  (* ; GradedTest("large tests", 5, executed large_tests)
   ; GradedTest("hidden tests", 5, hidden_tests)
   ; GradedTest("hidden large tests", 13, hidden_large_tests)
-  ; GradedTest("io tests", 10, executed_io io_tests)
+  ; GradedTest("io tests", 10, executed_io io_tests) *)
   ]
 
 let manual_tests : suite = [
-  GradedTest ("Posted Piazza Test Case", 5,
+  (* GradedTest ("Posted Piazza Test Case", 5,
               [("manually", assert_eq true false)]
              );
   GradedTest ("Other Student Piazza Tests", 5,
               [("manually", assert_eq true false)]
-             );
+             ); *)
 ]
 
 let graded_tests : suite =

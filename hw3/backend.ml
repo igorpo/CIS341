@@ -252,15 +252,17 @@ let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
 
 let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
-  let x_op = 
   begin match op with
     | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
-    | Alloc.Gid gl -> compile_operand_base Rip op
-    | Alloc.Loc lo -> compile_operand (Alloc.Loc lo)
-  end in 
-  [ Movq, [x_op; Reg R11]
-  ; Movq, [Reg R11; dest]
-  ]
+    | Alloc.Gid gl -> 
+      let x_op = compile_operand_base Rip op in
+      [ Movq, [x_op; Reg R11]]
+    | Alloc.Loc lo -> let x_op = compile_operand (Alloc.Loc lo) in
+    [ Movq, [x_op; Reg R11]]
+  end
+  @
+  [Movq, [Reg R11; dest]]
+  
 
   (* begin match t with
   | Void -> []
@@ -329,11 +331,12 @@ let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list
   let dest = compile_operand (Alloc.Loc l) in
   begin match op with
   | Alloc.Gid g -> 
-    let x_op = compile_operand_base Rip op in [ Leaq, [x_op; Reg R11]]
+    let x_op = compile_operand_base Rip op in [ Movq, [x_op; Reg R11]]
   | _ -> let x_op = compile_operand op in [ Movq, [x_op; Reg R11]]
   end 
   @
   [Movq, [Reg R11; dest]]
+
 (* 
 - Ret should properly exit the function: freeing stack space,
      restoring the value of %rbp, and putting the return value (if
@@ -404,31 +407,6 @@ let arg_loc_base (n : int) (r: X86.reg) : operand =
 let arg_loc (n : int) : operand = arg_loc_base n Rbp
   
 
-  (*
-    Fun of fty
-    fty = ty list * ty
-  *)
-
-let compile_func_arg (os:ty * Alloc.operand) : X86.operand =
-  let t, op = os in
-  begin match op with 
-    | Alloc.Gid g -> Imm (Lbl g)
-    | _ -> compile_operand op
-  end
- (*  begin match t with
-  | Ptr p ->
-      begin match op with 
-      | Gid g -> Imm (Lbl g)
-      | Loc lo -> 
-        begin match lo with
-        | LLbl l -> Imm (Lbl l)
-        | _ -> failwith "nah"
-        end
-      | _ -> Printf.printf "Wrong type %s\n" (string_of_operand (compile_operand op));failwith "wrong type"
-      end
-  | _ -> compile_operand op
-  end *)
-
 let compile_call_helper (i:X86.ins list * int) 
                         (os:ty * Alloc.operand) : X86.ins list * int =
   let ins, count = i in
@@ -439,19 +417,6 @@ let compile_call_helper (i:X86.ins list * int)
         [Leaq, [x_op; Reg R10]]
   | _ -> let x_op = compile_operand op in [Movq, [x_op; Reg R10]]
   end in
-
-
-  (* let arg_ins = begin match typ with
-    | Ptr p -> 
-      begin match p with
-      | Fun fn -> 
-        let x_op = compile_operand_base Rip op in
-        [Leaq, [x_op; Reg R10]]
-      | _ -> let x_op = compile_operand op in [Movq, [x_op; Reg R10]]
-      end
-    | _ -> let x_op = compile_operand op in [Movq, [x_op; Reg R10]]
-  end in *)
-  (* Printf.printf "Operand: %s\n" (string_of_operand x_op); *)
   let dest = arg_loc count in
   let new_ins = 
     if count < 6 then
@@ -557,8 +522,8 @@ let rec size_ty tdecls t : int =
       begin match t with 
       | Struct st -> 
         begin match h with 
-        | Alloc.Const c ->  
-          [ Addq, [Imm (Lit (idx tdecls c st)); Reg R11] 
+        | Alloc.Const c ->
+          [ Addq, [Imm (Lit (idx tdecls c st)); Reg Rcx] 
           ] @ (gep_helper tdecls (List.nth st (Int64.to_int c)) tl)
         | _ -> failwith "cannot use this as an index"
         end
@@ -566,7 +531,7 @@ let rec size_ty tdecls t : int =
         let s = size_ty tdecls tp in 
         [ Movq, [h_op; Reg R10]
         ; Imulq, [Imm (Lit (Int64.of_int s)); Reg R10]
-        ; Addq, [Reg R10; Reg R11]
+        ; Addq, [Reg R10; Reg Rcx]
         ] @ (gep_helper tdecls tp tl)
       | Namedt tp -> gep_helper tdecls (List.assoc tp tdecls) path
       | _ -> failwith "cannot calculate an offset with this type"
@@ -584,11 +549,11 @@ let compile_getelementptr tdecls (t:Ll.ty)
     let insns = 
     begin match os with 
     | h::tl -> 
-      let h_op = compile_operand_base Rip h in 
-      [ Movq, [base; Reg R11]
+      let h_op = compile_operand_base Rip h in (* the index of t' *)
+      [ Movq, [base; Reg Rcx]     (* R11 <- accumulative value *)
       ; Movq, [h_op; Reg R10]
       ; Imulq, [Imm (Lit (Int64.of_int s)); Reg R10]
-      ; Addq, [Reg R10; Reg R11]
+      (* ; Addq, [Reg R10; Reg Rcx] *)
       ] @ (gep_helper tdecls p tl) 
     | [] -> []
     end in 
@@ -601,7 +566,9 @@ let cmpl_gep tdecls (l:Alloc.loc) (t:ty) (op1:Alloc.operand)
                                      (opl:Alloc.operand list) : x86stream =
   let ins = compile_getelementptr tdecls t op1 opl in
   let dest = compile_operand (Alloc.Loc l) in
-  ins @ lift ([Movq, [Reg R11; dest]])
+  
+  lift ([Movq, [Reg Rcx; dest]]
+  ) @ ins
 
 (* compiling instructions within function bodies ---------------------------- *)
 
