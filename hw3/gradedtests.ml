@@ -103,14 +103,15 @@ let binop_tests =
   ; "llprograms/ashr.ll", 5L ]
 
 let calling_convention_tests =
-  [ "llprograms/call.ll", 42L
+  [ (* "llprograms/call.ll", 42L
   ; "llprograms/call1.ll", 17L  
   ; "llprograms/call2.ll", 19L
   ; "llprograms/call3.ll", 34L
   ; "llprograms/call4.ll", 34L
   ; "llprograms/call5.ll", 24L
-  ; "llprograms/call6.ll", 26L
-  (* ; "llprograms/ourtest.ll", 0L *)
+  ; "llprograms/call6.ll", 26L 
+  ; *)"llprograms/ourtest.ll", 8L
+  ;"llprograms/ourtest2.ll", 1L
   ]
 
 let memory_tests =
@@ -151,9 +152,6 @@ let io_tests =
   ; "llprograms/args1.ll", ["hello"; "cis341"], "hellocis341"
   ; "llprograms/args1.ll", ["hello"; "cis341"; "foo"], "argc > 3"   
   ]
-
-
-
 
 (* Hidden *)
 
