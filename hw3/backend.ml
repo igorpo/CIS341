@@ -236,9 +236,13 @@ let cmpl_cnd : Ll.cnd -> X86.cnd = function
 
 (* - Alloca: needs to return a pointer into the stack *)
 let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
-  (* let dest = compile_operand (Alloc.Loc l) in *)
+  let dest = compile_operand (Alloc.Loc l) in
   (* [Subq, [Imm (Lit 8L); Reg Rsp]] *)
-  []
+  [ Pushq, [Imm (Lit 0L)]
+  ; Movq, [Reg Rsp; Reg R11]
+  ; Movq, [Reg R11; dest]
+  ]
+  
   (* 
     Rsp -> R11
 
@@ -250,7 +254,7 @@ let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
      Null operands aren't valid pointers.  Don't forget to
      Platform.mangle the global identifier. *)
 
-let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
+(* let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
   begin match op with
     | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
@@ -261,25 +265,51 @@ let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
     [ Movq, [x_op; Reg R11]]
   end
   @
-  [Movq, [Reg R11; dest]]
+  [Movq, [Reg R11; dest]] *)
   
-
-  (* begin match t with
-  | Void -> []
-  | I1 | I8 | I64 -> []
-  | Ptr t -> []
-  | Struct ty_list -> []
-  | Array (_int, _ty) -> []
-  | Fun f -> []
-  | Namedt t -> []
-  end  *)
-
-let cmpl_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
+  (* Old store: *)
+(* let cmpl_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
   let x_op1 = compile_operand op1 in
   let x_op2 = compile_operand op2 in
   [ Movq, [x_op1; Reg R11]
   ; Movq, [Reg R11; x_op2] 
+  ] *)
+
+(* New load: *)
+let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
+  let dest = compile_operand (Alloc.Loc l) in
+  begin match op with
+    | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
+    | Alloc.Gid gl -> let x_op = compile_operand_base Rip op in
+     Printf.printf "load from G: %s\n" (string_of_operand x_op);
+      [ Movq, [x_op; Reg R11]] (* TODO: This is wrong, Leaq from global *)
+    | Alloc.Loc lo ->
+      let x_op = compile_operand (Alloc.Loc lo) in
+      Printf.printf "load from: %s\n" (string_of_operand x_op);
+      [ Movq, [x_op; Reg R10]
+      ; Movq, [Ind2 R10; Reg R11]]
+  end 
+  @
+  [Movq, [Reg R11; dest]
   ]
+
+  (* ; Movq, [Ind2 R10; Reg R11]] *)
+
+let cmpl_store (t:ty) (src:Alloc.operand) (dst_p:Alloc.operand) : X86.ins list =
+  let x_src = compile_operand src in
+  [ Movq, [x_src; Reg R11]] @ 
+  begin match dst_p with
+    | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
+    | Alloc.Gid gl -> let x_dst_p = compile_operand_base Rip dst_p in
+      [ Movq, [Reg R11; x_dst_p]]
+    | Alloc.Loc lo ->
+      let x_dst_p = compile_operand (Alloc.Loc lo) in
+      Printf.printf "store to: %s\n" (string_of_operand x_dst_p);
+      [ Movq, [x_dst_p; Reg R10]
+      ; Movq, [Reg R11; Ind2 R10]]
+  end
+ 
+
 
 
 (* - Br should jump *)
@@ -331,7 +361,7 @@ let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list
   let dest = compile_operand (Alloc.Loc l) in
   begin match op with
   | Alloc.Gid g -> 
-    let x_op = compile_operand_base Rip op in [ Movq, [x_op; Reg R11]]
+    let x_op = compile_operand_base Rip op in [ Leaq, [x_op; Reg R11]]
   | _ -> let x_op = compile_operand op in [ Movq, [x_op; Reg R11]]
   end 
   @
@@ -545,7 +575,6 @@ let compile_getelementptr tdecls (t:Ll.ty)
   begin match t with
   | Ptr p -> 
     let s = size_ty tdecls p in 
-    let base = compile_operand_base Rip o in 
     let insns = 
     begin match os with 
     | h::tl -> 
@@ -556,14 +585,28 @@ let compile_getelementptr tdecls (t:Ll.ty)
       ; Addq, [Reg R10; Reg Rcx]
       ] @ (gep_helper tdecls p tl) 
     | [] -> []
-    end in 
+    end 
+    
+    @
+    
+    begin match o with
+    | Alloc.Gid g -> 
+      let base = compile_operand_base Rip o in
+      [ Leaq, [base; Reg R11]]
+    | _ -> let base = compile_operand_base Rbp o in
+      [ Movq, [base; Reg R11]]
+    end in
     lift (insns @ 
       (* 
         Rcx contains the offset
        *)
-    [ Leaq, [base; Reg R10]
-    ; Addq, [Reg Rcx; Reg R10]
-    ; Movq, [Ind2 R10; Reg R11]])
+    [ Addq, [Reg Rcx; Reg R11] ]
+
+          (* For testing START *)
+    (* ; Movq, [Ind2 R10; Reg R11]] *)
+          (* For testing END *)
+
+  )
   | _ -> failwith "not a pointer"
   end 
 
