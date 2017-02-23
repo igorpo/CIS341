@@ -110,8 +110,6 @@ let calling_convention_tests =
   ; "llprograms/call4.ll", 34L
   ; "llprograms/call5.ll", 24L
   ; "llprograms/call6.ll", 26L 
-  (* ; "llprograms/ourtest.ll", 8L
-  ;"llprograms/ourtest2.ll", 1L *)
   ]
 
 let memory_tests =
@@ -121,12 +119,12 @@ let memory_tests =
   ]
 
 let terminator_tests =
-  [ (* "llprograms/return.ll", 0L
-  ; *) "llprograms/return42.ll", 42L
-  (* ; "llprograms/br1.ll", 9L
+  [ "llprograms/return.ll", 0L
+  ; "llprograms/return42.ll", 42L
+  ; "llprograms/br1.ll", 9L
   ; "llprograms/br2.ll", 17L     
   ; "llprograms/cbr1.ll", 7L
-  ; "llprograms/cbr2.ll", 9L *)
+  ; "llprograms/cbr2.ll", 9L
   ]
 
 let bitcast_tests =

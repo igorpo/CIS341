@@ -281,11 +281,11 @@ let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
   begin match op with
     | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
     | Alloc.Gid gl -> let x_op = compile_operand_base Rip op in
-     Printf.printf "load from G: %s\n" (string_of_operand x_op);
+     (* Printf.printf "load from G: %s\n" (string_of_operand x_op); *)
       [ Movq, [x_op; Reg R11]] (* TODO: This is wrong, Leaq from global *)
     | Alloc.Loc lo ->
       let x_op = compile_operand (Alloc.Loc lo) in
-      Printf.printf "load from: %s\n" (string_of_operand x_op);
+      (* Printf.printf "load from: %s\n" (string_of_operand x_op); *)
       [ Movq, [x_op; Reg R10]
       ; Movq, [Ind2 R10; Reg R11]]
   end 
@@ -304,7 +304,7 @@ let cmpl_store (t:ty) (src:Alloc.operand) (dst_p:Alloc.operand) : X86.ins list =
       [ Movq, [Reg R11; x_dst_p]]
     | Alloc.Loc lo ->
       let x_dst_p = compile_operand (Alloc.Loc lo) in
-      Printf.printf "store to: %s\n" (string_of_operand x_dst_p);
+      (* Printf.printf "store to: %s\n" (string_of_operand x_dst_p); *)
       [ Movq, [x_dst_p; Reg R10]
       ; Movq, [Reg R11; Ind2 R10]]
   end

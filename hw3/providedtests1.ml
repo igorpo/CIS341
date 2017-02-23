@@ -24,19 +24,17 @@ let exec_e2e_file path args =
 
 let executed tests =
   List.map (fun (fn, ans) ->
-    Printf.printf "Got %Ld, supposed to be %Ld\n" (exec_e2e_file fn "") ans; 
       fn, assert_eqf (fun () -> exec_e2e_file fn "") ans)
     tests
 
-let find_max_tests = [
-   "llprograms/find_max_recursive.ll", 122L
-  ; "llprograms/find_max_recursive1.ll", 252L (* 252 = unsiged -4. For some reason o'caml treats the result as unsigned int *)
-  ; "llprograms/find_max_recursive2.ll", 0L 
-  ; "llprograms/find_max_recursive3.ll", 12L
-] 
-
+let sqrt_tests =
+  [ "llprograms/sqrt1.ll", 10L
+  ; "llprograms/sqrt2.ll", 3L
+  ; "llprograms/sqrt3.ll", 0L
+  ; "llprograms/sqrt4.ll", 35L
+  ; "llprograms/sqrt5.ll", 210L
+  ]
 
 let provided_tests : suite = [
-  Test ("find max recursive tests", executed find_max_tests)
+  Test ("sqrt tests", executed sqrt_tests)
 ]
-
