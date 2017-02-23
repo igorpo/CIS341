@@ -19,8 +19,8 @@ define i64 @main(i64 %argc, i8** %argv) {
 
 define void @foo(%disju* %pu) {
   %p1 = getelementptr %disju, %disju* %pu, i32 0, i32 0
-  ; store i64 6, i64* %p1
-  ; %n1 = load i64, i64* %p1
+  store i64 6, i64* %p1
+  %n1 = load i64, i64* %p1
   ret void
 }
 

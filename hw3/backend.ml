@@ -358,7 +358,7 @@ let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list
   let dest = compile_operand (Alloc.Loc l) in
   begin match op with
   | Alloc.Gid g -> 
-    let x_op = compile_operand_base Rip op in [ Movq, [x_op; Reg R11]]
+    let x_op = compile_operand_base Rip op in [ Leaq, [x_op; Reg R11]]
   | _ -> let x_op = compile_operand op in [ Movq, [x_op; Reg R11]]
   end 
   @
