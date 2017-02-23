@@ -539,7 +539,7 @@ let rec size_ty tdecls t : int =
   let idx_helper (ii:int * int * int * tdc) (el:Ll.ty) : 
                                     (int * int * int * tdc) =
     let (n, i, acc, td) = ii in
-    if i >= n then
+    if i < n then
     let new_size = size_ty td el in
       n, i + 1, acc + new_size, td
     else 
@@ -563,7 +563,6 @@ let rec size_ty tdecls t : int =
         | _ -> failwith "cannot use this as an index"
         end
       | Array (a, tp) -> 
-         
         let s = size_ty tdecls tp in 
         [ Movq, [h_op; Reg R10]
         ; Imulq, [Imm (Lit (Int64.of_int s)); Reg R10]
@@ -836,14 +835,3 @@ let compile_prog {tdecls; gdecls; fdecls} : X86.prog =
   
   let f = fun (name, fdecl) -> prog_of_x86stream @@ compile_fdecl 
 tdecls name fdecl in  (List.map g gdecls) @ (List.map f fdecls |> List.flatten)
-
-
-
-
-
-
-(*
-  TODO:
-  
-
-*)
