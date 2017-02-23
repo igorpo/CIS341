@@ -139,6 +139,7 @@ end
 *)
 type layout = (uid * Alloc.loc) list 
 
+type tdc = (tid * ty) list
 
 (* Once we have a layout, it's simple to generate the allocated version of our
    LLVMlite program *)
@@ -533,24 +534,67 @@ let rec size_ty tdecls t : int =
    5. if the index is valid, the remainder of the path is computed as
       in (4), but relative to the type f the sub-element picked out
       by the path so far
-
-
-      | Gep of ty * operand * operand list (* getelementptr ty* %u, i64 %vi, ... *)
 *)
 
+  let idx_helper (ii:int * int * int * tdc) (el:Ll.ty) : 
+                                    (int * int * int * tdc) =
+    let (n, i, acc, td) = ii in
+    if i < n then
+    let new_size = size_ty td el in
+      n, i + 1, acc + new_size, td
+    else 
+      n, i + 1, acc, td
 
-(* let gep_helper (i:int64) (o:Alloc.operand) : int64 =
-  begin match o with 
-  | Struct st -> 
-  | Array (a, t) -> 
-  | Namedt t -> 
-  end in 
-  i (* we need to return ins list here probably cannot store offset  *) *)
- 
+  let idx tdecls (c:int64) (t_lst:Ll.ty list) : int64 =
+    let int_c = (Int64.to_int c) in
+    let _, _, acc, _ = List.fold_left idx_helper (int_c, 0, 0, tdecls) t_lst in
+    Int64.of_int acc
+
+  let rec gep_helper tdecls (t:Ll.ty) (path:Alloc.operand list) : X86.ins list =
+    begin match path with 
+    | h::tl -> 
+      let h_op = compile_operand_base Rip h in
+      begin match t with 
+      | Struct st -> 
+        begin match h with 
+        | Alloc.Const c ->  
+          [ Addq, [Imm (Lit (idx tdecls c st)); Reg R11] 
+          ] @ (gep_helper tdecls (List.nth st (Int64.to_int c)) tl)
+        | _ -> failwith "cannot use this as an index"
+        end
+      | Array (a, tp) -> 
+        let s = size_ty tdecls tp in 
+        [ Movq, [h_op; Reg R10]
+        ; Imulq, [Imm (Lit (Int64.of_int s)); Reg R10]
+        ; Addq, [Reg R10; Reg R11]
+        ] @ (gep_helper tdecls tp tl)
+      | Namedt tp -> gep_helper tdecls (List.assoc tp tdecls) path
+      | _ -> failwith "cannot calculate an offset with this type"
+      end  
+    | [] -> []
+    end
+  
+
 let compile_getelementptr tdecls (t:Ll.ty) 
                         (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
-  []
-
+  begin match t with
+  | Ptr p -> 
+    let s = size_ty tdecls p in 
+    let base = compile_operand_base Rip o in 
+    let insns = 
+    begin match os with 
+    | h::tl -> 
+      let h_op = compile_operand_base Rip h in 
+      [ Movq, [base; Reg R11]
+      ; Movq, [h_op; Reg R10]
+      ; Imulq, [Imm (Lit (Int64.of_int s)); Reg R10]
+      ; Addq, [Reg R10; Reg R11]
+      ] @ (gep_helper tdecls p tl) 
+    | [] -> []
+    end in 
+    lift insns
+  | _ -> failwith "not a pointer"
+  end 
 
 
 let cmpl_gep tdecls (l:Alloc.loc) (t:ty) (op1:Alloc.operand)
@@ -791,14 +835,3 @@ let compile_prog {tdecls; gdecls; fdecls} : X86.prog =
   
   let f = fun (name, fdecl) -> prog_of_x86stream @@ compile_fdecl 
 tdecls name fdecl in  (List.map g gdecls) @ (List.map f fdecls |> List.flatten)
-
-
-
-
-
-
-(*
-  TODO:
-  
-
-*)
