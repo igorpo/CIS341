@@ -236,9 +236,13 @@ let cmpl_cnd : Ll.cnd -> X86.cnd = function
 
 (* - Alloca: needs to return a pointer into the stack *)
 let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
-  (* let dest = compile_operand (Alloc.Loc l) in *)
+  let dest = compile_operand (Alloc.Loc l) in
   (* [Subq, [Imm (Lit 8L); Reg Rsp]] *)
-  []
+  [ Pushq, [Imm (Lit 0L)]
+  ; Movq, [Reg Rsp; Reg R11]
+  ; Movq, [Reg R11; dest]
+  ]
+  
   (* 
     Rsp -> R11
 
@@ -294,7 +298,6 @@ let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
 let cmpl_store (t:ty) (src:Alloc.operand) (dst_p:Alloc.operand) : X86.ins list =
   let x_src = compile_operand src in
   [ Movq, [x_src; Reg R11]] @ 
-
   begin match dst_p with
     | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
     | Alloc.Gid gl -> let x_dst_p = compile_operand_base Rip dst_p in
