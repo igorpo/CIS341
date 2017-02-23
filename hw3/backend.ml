@@ -468,7 +468,7 @@ let rec size_ty tdecls t : int =
   begin match t with 
   | I1 | I64 | Ptr _ -> 8
   | Array (n, t_elm) -> n * (size_ty tdecls t_elm)
-  | Struct ts -> List.fold_left (fun sum c -> sum + size_ty tdecls c) 0 ts
+  | Struct ts -> List.fold_left (fun sum c -> sum + size_ty tdecls c) 8 ts
   | Namedt s -> size_ty tdecls (List.assoc s tdecls)
   | _ -> 0 (* corresponds to Void, I8, Fun *)
   end
@@ -550,14 +550,20 @@ let compile_getelementptr tdecls (t:Ll.ty)
     begin match os with 
     | h::tl -> 
       let h_op = compile_operand_base Rip h in (* the index of t' *)
-      [ Movq, [base; Reg Rcx]     (* R11 <- accumulative value *)
-      ; Movq, [h_op; Reg R10]
-      ; Imulq, [Imm (Lit (Int64.of_int s)); Reg R10]
-      (* ; Addq, [Reg R10; Reg Rcx] *)
+      [ Movq, [ Imm (Lit 0L); Reg Rcx]     
+      ; Movq, [ h_op; Reg R10]
+      ; Imulq, [ Imm (Lit (Int64.of_int s)); Reg R10]
+      ; Addq, [Reg R10; Reg Rcx]
       ] @ (gep_helper tdecls p tl) 
     | [] -> []
     end in 
-    lift insns
+    lift (insns @ 
+      (* 
+        Rcx contains the offset
+       *)
+    [ Leaq, [base; Reg R10]
+    ; Addq, [Reg Rcx; Reg R10]
+    ; Movq, [Ind2 R10; Reg R11]])
   | _ -> failwith "not a pointer"
   end 
 
@@ -566,8 +572,7 @@ let cmpl_gep tdecls (l:Alloc.loc) (t:ty) (op1:Alloc.operand)
                                      (opl:Alloc.operand list) : x86stream =
   let ins = compile_getelementptr tdecls t op1 opl in
   let dest = compile_operand (Alloc.Loc l) in
-  
-  lift ([Movq, [Reg Rcx; dest]]
+  lift ([Movq, [Reg R11; dest]]
   ) @ ins
 
 (* compiling instructions within function bodies ---------------------------- *)
