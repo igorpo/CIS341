@@ -134,13 +134,13 @@ let bitcast_tests =
 
 let gep_tests =
   [ "llprograms/gep1.ll", 6L
-  (* ; "llprograms/gep2.ll", 4L
+  ; "llprograms/gep2.ll", 4L
   ; "llprograms/gep3.ll", 1L
   ; "llprograms/gep4.ll", 2L
   ; "llprograms/gep5.ll", 4L
   ; "llprograms/gep6.ll", 7L
-  ; "llprograms/gep7.ll", 7L     *)
-  (* ; "llprograms/gep8.ll", 2L *)
+  ; "llprograms/gep7.ll", 7L
+  ; "llprograms/gep8.ll", 2L
   ]
 
 let io_tests =

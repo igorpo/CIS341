@@ -468,7 +468,7 @@ let rec size_ty tdecls t : int =
   begin match t with 
   | I1 | I64 | Ptr _ -> 8
   | Array (n, t_elm) -> n * (size_ty tdecls t_elm)
-  | Struct ts -> List.fold_left (fun sum c -> sum + size_ty tdecls c) 8 ts
+  | Struct ts -> List.fold_left (fun sum c -> sum + size_ty tdecls c) 0 ts
   | Namedt s -> size_ty tdecls (List.assoc s tdecls)
   | _ -> 0 (* corresponds to Void, I8, Fun *)
   end
@@ -518,7 +518,7 @@ let rec size_ty tdecls t : int =
   let rec gep_helper tdecls (t:Ll.ty) (path:Alloc.operand list) : X86.ins list =
     begin match path with 
     | h::tl -> 
-      let h_op = compile_operand_base Rip h in
+      let h_op = compile_operand_base Rbp h in
       begin match t with 
       | Struct st -> 
         begin match h with 
