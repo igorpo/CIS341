@@ -68,19 +68,14 @@ type insn =
    associated parts of the x86 machine *)
 type fbody = (loc * insn) list
 
-(* Converting between Ll function bodies and allocate function bodies given
-   two functions
-   f : uid -> loc
-   g : gid -> X86.lbl *)
-let map_operand f g : Ll.operand -> operand = (* Printf.printf "map_operand\n"; *) function
-  | Null -> (* Printf.printf "Null\n";   *)Null
-  | Const i -> (* Printf.printf "Const\n"; *) Const i
-  | Gid x -> (* Printf.printf "Gid\n"; *) Gid (g x)
-  | Id u -> (* Printf.printf "Id %s\n" *) Loc (f u)
+let map_operand f g : Ll.operand -> operand = function
+  | Null -> Null
+  | Const i -> Const i
+  | Gid x -> Gid (g x)
+  | Id u -> Loc (f u)
 
 let map_insn f g : Ll.insn -> insn = 
-  let mo = map_operand f g in 
-  (* Printf.printf "map_insn\n"; *) function
+  let mo = map_operand f g in function
   | Binop (b,t,o,o') -> Binop (b,t,mo o,mo o')
   | Alloca t         -> Alloca t
   | Load (t,o)       -> Load (t,mo o)
@@ -91,7 +86,7 @@ let map_insn f g : Ll.insn -> insn =
   | Gep (t,o,is)     -> Gep (t,mo o,List.map mo is)
 
 let map_terminator f g : Ll.terminator -> insn = 
-  let mo = map_operand f g in (* Printf.printf "map_terminator\n";  *)function
+  let mo = map_operand f g in function
   | Ret (t,None)   -> Ret (t, None)
   | Ret (t,Some o) -> Ret (t, Some (mo o))
   | Br l           -> Br (f l)
@@ -99,8 +94,7 @@ let map_terminator f g : Ll.terminator -> insn =
 
 let of_block f g (b:Ll.block) : fbody =
   let b = List.map (fun (u,i) -> f u, map_insn f g i) b.insns
-  @ [LVoid, map_terminator f g b.terminator] in
-  (* Printf.printf "Called this"; *) b
+  @ [LVoid, map_terminator f g b.terminator] in b
                                 
 let of_lbl_block f g (l,b:Ll.lbl * Ll.block) : fbody =
   (LLbl (Platform.mangle l), ILbl)::of_block f g b
@@ -144,7 +138,7 @@ type tdc = (tid * ty) list
 (* Once we have a layout, it's simple to generate the allocated version of our
    LLVMlite program *)
 let alloc_cfg (layout:layout) (g:Ll.cfg) : Alloc.fbody =
-  Alloc.of_cfg (fun x -> (* Printf.printf "Layout\n";  *)List.assoc x layout) 
+  Alloc.of_cfg (fun x -> List.assoc x layout) 
                (fun l -> Platform.mangle l) g
 
 (* streams of x86 instructions ---------------------------------------------- *)
@@ -163,9 +157,9 @@ let ( >:: ) x y = y :: x
 
 let prog_of_x86stream : x86stream -> X86.prog =
   let rec loop p iis = function
-    | [] -> (match iis with [] -> p | _ -> failwith "stream has no initial label")
-    | (I i)::s' -> loop p (i::iis) s'
-    | (L (l,global))::s' -> loop ({ lbl=l; global; asm=Text iis }::p) [] s'
+  | [] -> (match iis with [] -> p | _ -> failwith "stream has no initial label")
+  | (I i)::s' -> loop p (i::iis) s'
+  | (L (l,global))::s' -> loop ({ lbl=l; global; asm=Text iis }::p) [] s'
   in loop [] []
 
 
@@ -237,43 +231,10 @@ let cmpl_cnd : Ll.cnd -> X86.cnd = function
 (* - Alloca: needs to return a pointer into the stack *)
 let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
-  (* [Subq, [Imm (Lit 8L); Reg Rsp]] *)
   [ Pushq, [Imm (Lit 0L)]
   ; Movq, [Reg Rsp; Reg R11]
   ; Movq, [Reg R11; dest]
   ]
-  
-  (* 
-    Rsp -> R11
-
-    Decrement Rsp by 8
-
-  *)
-
-(* - Load & Store: these need to dereference the pointers. Const and
-     Null operands aren't valid pointers.  Don't forget to
-     Platform.mangle the global identifier. *)
-
-(* let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
-  let dest = compile_operand (Alloc.Loc l) in
-  begin match op with
-    | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
-    | Alloc.Gid gl -> 
-      let x_op = compile_operand_base Rip op in
-      [ Movq, [x_op; Reg R11]]
-    | Alloc.Loc lo -> let x_op = compile_operand (Alloc.Loc lo) in
-    [ Movq, [x_op; Reg R11]]
-  end
-  @
-  [Movq, [Reg R11; dest]] *)
-  
-  (* Old store: *)
-(* let cmpl_store (t:ty) (op1:Alloc.operand) (op2:Alloc.operand) : X86.ins list =
-  let x_op1 = compile_operand op1 in
-  let x_op2 = compile_operand op2 in
-  [ Movq, [x_op1; Reg R11]
-  ; Movq, [Reg R11; x_op2] 
-  ] *)
 
 (* New load: *)
 let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
@@ -281,11 +242,9 @@ let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
   begin match op with
     | Alloc.Const _ | Alloc.Null-> failwith "invalid pointers"
     | Alloc.Gid gl -> let x_op = compile_operand_base Rip op in
-     (* Printf.printf "load from G: %s\n" (string_of_operand x_op); *)
-      [ Movq, [x_op; Reg R11]] (* TODO: This is wrong, Leaq from global *)
+      [ Movq, [x_op; Reg R11]]
     | Alloc.Loc lo ->
       let x_op = compile_operand (Alloc.Loc lo) in
-      (* Printf.printf "load from: %s\n" (string_of_operand x_op); *)
       [ Movq, [x_op; Reg R10]
       ; Movq, [Ind2 R10; Reg R11]]
   end 
@@ -304,14 +263,10 @@ let cmpl_store (t:ty) (src:Alloc.operand) (dst_p:Alloc.operand) : X86.ins list =
       [ Movq, [Reg R11; x_dst_p]]
     | Alloc.Loc lo ->
       let x_dst_p = compile_operand (Alloc.Loc lo) in
-      (* Printf.printf "store to: %s\n" (string_of_operand x_dst_p); *)
       [ Movq, [x_dst_p; Reg R10]
       ; Movq, [Reg R11; Ind2 R10]]
   end
  
-
-
-
 (* - Br should jump *)
 let cmpl_br (l:Alloc.loc) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
@@ -323,8 +278,6 @@ let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
   let x_op = compile_operand op in
   let x_lbl1 = compile_operand (Alloc.Loc l1) in
   let x_lbl2 = compile_operand (Alloc.Loc l2) in
-  (* Printf.printf "x_lbl1 = %s\n" (string_of_operand x_lbl1);
-  Printf.printf "x_lbl2 = %s\n" (string_of_operand x_lbl2); *)
   [ Movq, [Imm (Lit 0L); Reg R11]
   ; Cmpq, [Reg R11; x_op] 
   ; J Eq,     [x_lbl2]
@@ -338,16 +291,9 @@ let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
 let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand) 
                                         (op2:Alloc.operand) : X86.ins list =
   let cc = cmpl_cnd c in
-  (* Printf.printf "cnd = %s\n" (string_of_cnd cc); *)
   let dest = compile_operand (Alloc.Loc l) in
-    (* begin match l with
-    | Alloc.LStk ls -> 
-    | _ -> failwith "can't handle this type here"
-    end in *)
-  (* Printf.printf "cmp = %s\n" (string_of_operand dest); *)
   let x_op1 = compile_operand op1 in
   let x_op2 = compile_operand op2 in
-  (* Printf.printf "x_op1 = %s x_op2 = %s\n" (string_of_operand x_op1) (string_of_operand x_op2); *)
   [ Movq, [x_op1; Reg R10]
   ; Movq, [x_op2; Reg R11]
   ; Movq, [Imm (Lit 0L); dest]  (* zero-init dest *)
@@ -357,15 +303,14 @@ let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand)
 
 
 (* - Bitcast: does nothing interesting at the assembly level *)
-let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
+let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) 
+                                                          : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
   begin match op with
   | Alloc.Gid g -> 
     let x_op = compile_operand_base Rip op in [ Leaq, [x_op; Reg R11]]
   | _ -> let x_op = compile_operand op in [ Movq, [x_op; Reg R11]]
-  end 
-  @
-  [Movq, [Reg R11; dest]]
+  end @ [Movq, [Reg R11; dest]]
 
 (* 
 - Ret should properly exit the function: freeing stack space,
@@ -374,7 +319,7 @@ let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list
 *)
 let cmpl_ret (t:ty) (op:Alloc.operand option) : X86.ins list =
   let i = begin match op with
-  | Some o -> (* Printf.printf "cmpl_ret: Some o \n"; *)
+  | Some o ->
     let x_op = compile_operand o in
     [Movq, [x_op; Reg Rax]]
   | None -> []
@@ -597,15 +542,7 @@ let compile_getelementptr tdecls (t:Ll.ty)
       [ Movq, [base; Reg R11]]
     end in
     lift (insns @ 
-      (* 
-        Rcx contains the offset
-       *)
     [ Addq, [Reg Rcx; Reg R11] ]
-
-          (* For testing START *)
-    (* ; Movq, [Ind2 R10; Reg R11]] *)
-          (* For testing END *)
-
   )
   | _ -> failwith "not a pointer"
   end 
@@ -654,7 +591,7 @@ let cmpl_gep tdecls (l:Alloc.loc) (t:ty) (op1:Alloc.operand)
 *)
 
 let cmpl_call (l:Alloc.loc) (t:ty) (op:Alloc.operand) 
-                                    (args:(ty * Alloc.operand) list) : x86stream =
+                                (args:(ty * Alloc.operand) list) : x86stream =
   let insns = compile_call op args in
   let pre = begin match l with
   | Alloc.LVoid -> []
@@ -687,7 +624,7 @@ let compile_insn tdecls (l:Alloc.loc) (i:Alloc.insn) : x86stream =
 
 
 let compile_body_helper (l: x86stream * (tid * ty) list)
-                                    (el:Alloc.loc * Alloc.insn) : (x86stream * ((tid * ty) list)) =
+               (el:Alloc.loc * Alloc.insn) : (x86stream * ((tid * ty) list)) =
   let _l, tdecls = l in
   let lo, li = el in
   (compile_insn tdecls lo li @ _l, tdecls)
@@ -721,15 +658,12 @@ let layout_insn_classifier (m:layout * int) (l:uid * insn) : layout * int =
   | Store (x,_,_) -> 
     begin match x with
     | _ -> (map @ [(u, Alloc.LVoid)], count)
-    (* | _ -> (map @ [(u, Alloc.LStk count)], new_count) *)
     end
   | Call (x,_,_) -> 
     begin match x with
     | Void -> (map @ [(u, Alloc.LVoid)], count)
     | _ -> (map @ [(u, Alloc.LStk count)], new_count)
     end
-  
-  (* | Alloca _ -> (map, count) *)
   | _ -> (map @ [(u, Alloc.LStk count)], new_count)
   end
 
@@ -750,9 +684,13 @@ let args_helper (u: uid) (m:layout * int * int) : layout * int * int =
 let stack_layout (f:Ll.fdecl) : layout =
   let entry_blk, lbld_blks = f.cfg in
   let args_count = List.length f.param in
-  let map_w_args, _, _ = List.fold_right args_helper f.param ([], args_count, args_count) in
-  let map_w_locals, c = List.fold_left layout_insn_classifier (map_w_args, -8 * (args_count+1)) entry_blk.insns in
-  let final_map, _ = List.fold_left label_block_helper (map_w_locals, c) lbld_blks in
+  let map_w_args, _, _ = 
+    List.fold_right args_helper f.param ([], args_count, args_count) in
+  let map_w_locals, c = 
+    List.fold_left layout_insn_classifier (map_w_args, 
+                  -8 * (args_count+1)) entry_blk.insns in
+  let final_map, _ = 
+    List.fold_left label_block_helper (map_w_locals, c) lbld_blks in
   final_map
 
 (* The code for the entry-point of a function must do several things:
@@ -776,9 +714,7 @@ let stack_layout (f:Ll.fdecl) : layout =
 
 let push_helper (l:X86.ins list * int) (u:uid)  : (X86.ins list * int) =
   let insns, count = l in
-  let new_ins = (* if count < 6 then *)
-    [(Pushq, [arg_loc_base count Rbp])]
-  (* else []  *)in
+  let new_ins = [(Pushq, [arg_loc_base count Rbp])] in
   (new_ins @ insns, count + 1)
 
 let gen_push_args_to_stack (arg_list:uid list) : X86.ins list =
@@ -789,21 +725,15 @@ let gen_push_args_to_stack (arg_list:uid list) : X86.ins list =
 let count_helper (c:int) (el:uid * Alloc.loc) : int =
   let u, l = el in
   begin match l with
-  | Alloc.LStk s -> (* Printf.printf "counting this %s %d \n" u (c+1); *) c + 1
+  | Alloc.LStk s -> c + 1
   | _ -> c
   end
 
 let count_local_variables (c:Ll.cfg) : int = 
-  (* 
-    type block = { 
-      insns: (uid * insn) list; terminator: terminator }
-   *)
   let entry_blk, lbld_blks = c in
   let map, _ = List.fold_left layout_insn_classifier ([], 0) entry_blk.insns in
   let final_map, _ = List.fold_left label_block_helper (map, 0) lbld_blks in
-  (* let n =  *)
   List.fold_left count_helper 0 final_map 
-  (*in  Printf.printf "Count == %d\n" n; n *)
 
 let generate_prologue (f:Ll.fdecl) : X86.ins list = 
   let arg_list = f.param in
@@ -815,16 +745,12 @@ let generate_prologue (f:Ll.fdecl) : X86.ins list =
     [Subq, [Imm (Lit (Int64.of_int (8 * (num_vars)))); Reg Rsp]]
   else []
 
-let generate_epilogue (l:layout) : X86.ins list = 
-  [] (* TODO: subtract from Rsp *)
-
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let l = stack_layout f in
   let prologue = generate_prologue f in
   let fbody = alloc_cfg l f.cfg in
   let body_insn = compile_fbody tdecls fbody in
-  let epilogue = generate_epilogue l in
-  (lift epilogue) @ body_insn @ (lift prologue) @ [L (Platform.mangle g, true)]
+  body_insn @ (lift prologue) @ [L (Platform.mangle g, true)]
 
 (* compile_gdecl ------------------------------------------------------------ *)
 
