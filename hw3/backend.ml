@@ -532,7 +532,7 @@ let compile_getelementptr tdecls (t:Ll.ty)
     let insns = 
     begin match os with 
     | h::tl -> 
-      let h_op = compile_operand_base Rip h in (* the index of t' *)
+      let h_op = compile_operand_base Rbp h in (* the index of t' *)
       [ Movq, [ Imm (Lit 0L); Reg Rcx]     
       ; Movq, [ h_op; Reg R10]
       ; Imulq, [ Imm (Lit (Int64.of_int s)); Reg R10]
