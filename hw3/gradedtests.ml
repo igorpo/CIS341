@@ -73,7 +73,7 @@ let c_link_test c_files path args =
 
 let executed tests =
   List.map (fun (fn, ans) ->
-      (* Printf.printf "Got %Ld, supposed to be %Ld\n" (exec_e2e_file fn "") ans;  *)
+      Printf.printf "Got %Ld, supposed to be %Ld\n" (exec_e2e_file fn "") ans;
       fn, assert_eqf (fun () -> exec_e2e_file fn "") ans)
     tests
 
@@ -110,6 +110,10 @@ let calling_convention_tests =
   ; "llprograms/call4.ll", 34L
   ; "llprograms/call5.ll", 24L
   ; "llprograms/call6.ll", 26L 
+  ; "llprograms/call7.ll", 7L
+  ; "llprograms/call8.ll", 21L
+  (* ; "llprograms/sieve.ll", 0L
+  ; "llprograms/lfsr.ll", 0L *)
   ]
 
 let memory_tests =
@@ -167,7 +171,7 @@ let large_tests = [ "llprograms/list1.ll", 3L
                   ]
 
 let tests : suite =
-  [GradedTest("size_ty tests", 5, size_ty_tests)
+  [ GradedTest("size_ty tests", 5, size_ty_tests)
   ; GradedTest("arg_loc tests", 5, arg_loc_tests)
   ; GradedTest("executed binop tests", 5, executed binop_tests)
   ; GradedTest("terminator tests", 10, executed terminator_tests)

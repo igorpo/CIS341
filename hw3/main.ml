@@ -16,7 +16,7 @@ let add_link_file path =
   link_files := path :: (!link_files)
 
 exception Ran_tests
-let suite = ref (Providedtests.provided_tests @ Gradedtests.graded_tests @ Providedtests1.provided_tests)
+let suite = ref (Providedtests.provided_tests @ Gradedtests.graded_tests)
 
 let execute_tests () =
   Platform.configure ();
