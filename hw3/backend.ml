@@ -99,7 +99,7 @@ let map_terminator f g : Ll.terminator -> insn =
 let of_block f g (b:Ll.block) : fbody =
   List.map (fun (u,i) -> f u, map_insn f g i) b.insns
   @ [LVoid, map_terminator f g b.terminator]
-                                
+  
 let of_lbl_block f g (l,b:Ll.lbl * Ll.block) : fbody =
   (LLbl (Platform.mangle l), ILbl)::of_block f g b
 
@@ -161,9 +161,9 @@ let ( >:: ) x y = y :: x
 
 let prog_of_x86stream : x86stream -> X86.prog =
   let rec loop p iis = function
-    | [] -> (match iis with [] -> p | _ -> failwith "stream has no initial label")
-    | (I i)::s' -> loop p (i::iis) s'
-    | (L (l,global))::s' -> loop ({ lbl=l; global; asm=Text iis }::p) [] s'
+  | [] -> (match iis with [] -> p | _ -> failwith "stream has no initial label")
+  | (I i)::s' -> loop p (i::iis) s'
+  | (L (l,global))::s' -> loop ({ lbl=l; global; asm=Text iis }::p) [] s'
   in loop [] []
 
 
@@ -268,9 +268,6 @@ let cmpl_store (t:ty) (src:Alloc.operand) (dst_p:Alloc.operand) : X86.ins list =
       ; Movq, [Reg R11; Ind2 R10]]
   end
  
-
-
-
 (* - Br should jump *)
 let cmpl_br (l:Alloc.loc) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
@@ -308,15 +305,14 @@ let cmpl_icmp (l:Alloc.loc) (c:Ll.cnd) (t:ty) (op1:Alloc.operand)
 
 
 (* - Bitcast: does nothing interesting at the assembly level *)
-let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) : X86.ins list =
+let cmpl_bitcast (l:Alloc.loc) (t1:ty) (op:Alloc.operand) (t2:ty) 
+                                                          : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
   begin match op with
   | Alloc.Gid g -> 
     let x_op = compile_operand_base Rip op in [ Leaq, [x_op; Reg R11]]
   | _ -> let x_op = compile_operand op in [ Movq, [x_op; Reg R11]]
-  end 
-  @
-  [Movq, [Reg R11; dest]]
+  end @ [Movq, [Reg R11; dest]]
 
 (* 
 - Ret should properly exit the function: freeing stack space,
@@ -605,7 +601,7 @@ let cmpl_gep tdecls (l:Alloc.loc) (t:ty) (op1:Alloc.operand)
 *)
 
 let cmpl_call (l:Alloc.loc) (t:ty) (op:Alloc.operand) 
-                                    (args:(ty * Alloc.operand) list) : x86stream =
+                                (args:(ty * Alloc.operand) list) : x86stream =
   let insns = compile_call op args in
   let pre = begin match l with
   | Alloc.LVoid -> []
@@ -638,7 +634,7 @@ let compile_insn tdecls (l:Alloc.loc) (i:Alloc.insn) : x86stream =
 
 
 let compile_body_helper (l: x86stream * (tid * ty) list)
-                                    (el:Alloc.loc * Alloc.insn) : (x86stream * ((tid * ty) list)) =
+               (el:Alloc.loc * Alloc.insn) : (x86stream * ((tid * ty) list)) =
   let _l, tdecls = l in
   let lo, li = el in
   (compile_insn tdecls lo li @ _l, tdecls)
@@ -698,9 +694,13 @@ let args_helper (u: uid) (m:layout * int * int) : layout * int * int =
 let stack_layout (f:Ll.fdecl) : layout =
   let entry_blk, lbld_blks = f.cfg in
   let args_count = List.length f.param in
-  let map_w_args, _, _ = List.fold_right args_helper f.param ([], args_count, args_count) in
-  let map_w_locals, c = List.fold_left layout_insn_classifier (map_w_args, -8 * (args_count+1)) entry_blk.insns in
-  let final_map, _ = List.fold_left label_block_helper (map_w_locals, c) lbld_blks in
+  let map_w_args, _, _ = 
+    List.fold_right args_helper f.param ([], args_count, args_count) in
+  let map_w_locals, c = 
+    List.fold_left layout_insn_classifier (map_w_args, 
+                  -8 * (args_count+1)) entry_blk.insns in
+  let final_map, _ = 
+    List.fold_left label_block_helper (map_w_locals, c) lbld_blks in
   final_map
 
 (* The code for the entry-point of a function must do several things:
@@ -735,7 +735,7 @@ let gen_push_args_to_stack (arg_list:uid list) : X86.ins list =
 let count_helper (c:int) (el:uid * Alloc.loc) : int =
   let u, l = el in
   begin match l with
-  | Alloc.LStk s ->  c + 1
+  | Alloc.LStk s -> c + 1
   | _ -> c
   end
 
