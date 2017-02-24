@@ -24,7 +24,7 @@ let exec_e2e_file path args =
 
 let executed tests =
   List.map (fun (fn, ans) ->
-    Printf.printf "Got %Ld, supposed to be %Ld\n" (exec_e2e_file fn "") ans; 
+      Printf.printf "Got %Ld, supposed to be %Ld\n" (exec_e2e_file fn "") ans; 
       fn, assert_eqf (fun () -> exec_e2e_file fn "") ans)
     tests
 

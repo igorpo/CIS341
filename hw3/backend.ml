@@ -68,6 +68,10 @@ type insn =
    associated parts of the x86 machine *)
 type fbody = (loc * insn) list
 
+(* Converting between Ll function bodies and allocate function bodies given
+   two functions
+   f : uid -> loc
+   g : gid -> X86.lbl *)
 let map_operand f g : Ll.operand -> operand = function
   | Null -> Null
   | Const i -> Const i
@@ -93,9 +97,9 @@ let map_terminator f g : Ll.terminator -> insn =
   | Cbr (o,l,l')   -> Cbr (mo o,f l,f l')
 
 let of_block f g (b:Ll.block) : fbody =
-  let b = List.map (fun (u,i) -> f u, map_insn f g i) b.insns
-  @ [LVoid, map_terminator f g b.terminator] in b
-                                
+  List.map (fun (u,i) -> f u, map_insn f g i) b.insns
+  @ [LVoid, map_terminator f g b.terminator]
+  
 let of_lbl_block f g (l,b:Ll.lbl * Ll.block) : fbody =
   (LLbl (Platform.mangle l), ILbl)::of_block f g b
 
@@ -236,7 +240,6 @@ let cmpl_alloca (l:Alloc.loc) (t:ty) : X86.ins list =
   ; Movq, [Reg R11; dest]
   ]
 
-(* New load: *)
 let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
   let dest = compile_operand (Alloc.Loc l) in
   begin match op with
@@ -251,8 +254,6 @@ let cmpl_load (l:Alloc.loc) (t:ty) (op:Alloc.operand) : X86.ins list =
   @
   [Movq, [Reg R11; dest]
   ]
-
-  (* ; Movq, [Ind2 R10; Reg R11]] *)
 
 let cmpl_store (t:ty) (src:Alloc.operand) (dst_p:Alloc.operand) : X86.ins list =
   let x_src = compile_operand src in
@@ -279,7 +280,8 @@ let cmpl_cbr (op:Alloc.operand) (l1:Alloc.loc) (l2:Alloc.loc) : X86.ins list =
   let x_lbl1 = compile_operand (Alloc.Loc l1) in
   let x_lbl2 = compile_operand (Alloc.Loc l2) in
   [ Movq, [Imm (Lit 0L); Reg R11]
-  ; Cmpq, [Reg R11; x_op] 
+  ; Movq, [x_op; Reg R10] 
+  ; Cmpq, [Reg R11; Reg R10] 
   ; J Eq,     [x_lbl2]
   ; Jmp,      [x_lbl1]
   ]
@@ -403,9 +405,16 @@ let compile_call_helper (i:X86.ins list * int)
   (ins @ arg_ins @ new_ins, count + 1)
 
 
+let gen_arg_list (os:(ty * Alloc.operand) list) : (ty * Alloc.operand) list =
+  begin match os with
+  | a1::a2::a3::a4::a5::a6::tl -> [a1;a2;a3;a4;a5;a6] @ List.rev tl 
+  | _ -> os
+  end
+
 
 let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream = 
-  let arg_ins, _ = List.fold_left compile_call_helper ([], 0) os in
+  let args = gen_arg_list os in
+  let arg_ins, _ = List.fold_left compile_call_helper ([], 0) (args) in
   let fn = begin match fo with 
     | Alloc.Gid g -> Imm (Lbl g)
     | _ -> failwith "wrong type"
@@ -413,7 +422,7 @@ let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream =
   let num_args = Int64.of_int ((8 * List.length os)) in
   let call_ins = 
     [ Callq, [fn]] @
-    if num_args > 0L then [Addq, [Imm (Lit num_args); Reg Rsp]] else []
+    if num_args > 0L then [] (* [Addq, [Imm (Lit num_args); Reg Rsp]]  *)else []
     in lift (arg_ins @ call_ins)
 
 
@@ -542,6 +551,7 @@ let compile_getelementptr tdecls (t:Ll.ty)
       [ Movq, [base; Reg R11]]
     end in
     lift (insns @ 
+      (* Rcx contains the offset *)
     [ Addq, [Reg Rcx; Reg R11] ]
   )
   | _ -> failwith "not a pointer"

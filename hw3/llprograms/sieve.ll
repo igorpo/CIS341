@@ -1,3 +1,5 @@
+declare i64* @ll_malloc(i64, i64)
+
 define i64 @main(i64 %argc, i8** %argv) {
   %1 = call i64 @is_prime(i64 347)
   ret i64 %1
