@@ -33,8 +33,12 @@
   ("else", ELSE);
   ("if", IF);
   ("while", WHILE);
+  ("new", NEW);
+  ("for", FOR);
   ("return", RETURN);
   ("var", VAR);
+  ("true", TRUE);
+  ("false", FALSE);
   ("global", GLOBAL);
 
   (* Symbols *)
@@ -53,6 +57,18 @@
   ( ")", RPAREN);
   ( "[", LBRACKET);
   ( "]", RBRACKET);
+  ( "<<", LTLT);
+  ( ">>", GTGT);
+  ( ">>>", GTGTGT);
+  ( "<", LT);
+  ( "<=", LTEQ); 
+  ( ">", GT);
+  ( ">=", GTEQ);
+  ( "!=", BANGEQ);
+  ( "&", AMP);
+  ( "|", PIPE);
+  ( "[&]", LBAMPRB);
+  ( "[|]", LBPIPERB);
   
   ]
 
@@ -128,7 +144,10 @@ rule token = parse
   | newline { newline lexbuf; token lexbuf }
 
   | ';' | ',' | '{' | '}' | '+' | '-' | '*' | '=' | "==" 
-  | "!=" | '!' | '~' | '(' | ')' | '[' | ']' 
+  | "!=" | '!' | '~' | '(' | ')' | '[' | ']' | "<<" | ">>"
+  | ">>>" | '<' | "<=" | '>' | ">=" | "!=" | '&'| '|' | "[&]"
+  | "[|]"
+
     { create_token lexbuf }
 
   | _ as c { unexpected_char lexbuf c }
