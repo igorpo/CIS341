@@ -1,0 +1,48 @@
+/*
+ * CIS 341 Homework 4
+ * Thomas Delacour & Max McCarthy
+ */
+
+/**
+ * Computes longest common subsequence of two strings a and b.
+ */
+global buf = int[]{0};
+
+string lcs(int i, int j, string a, string b) {
+    if (i < 0 | j < 0) {
+      return "";
+    }
+
+    var a_chars = array_of_string(a);
+    var b_chars = array_of_string(b);
+
+    var last_char_a = a_chars[i];
+    var last_char_b = b_chars[j];
+
+    if (last_char_a == last_char_b) {
+        var prev_lcs = lcs(i - 1, j - 1, a, b);
+        buf[0] = a_chars[i];
+        var next_char = string_of_array(buf);
+        return string_cat(prev_lcs, next_char);
+    }
+
+    var left_lcs = lcs(i, j - 1, a, b);
+    var right_lcs = lcs(i - 1, j, a, b);
+
+    var left_len = length_of_string(left_lcs);
+    var right_len = length_of_string(right_lcs);
+
+    if (left_len < right_len) {
+        return right_lcs;
+    } else {
+        return left_lcs;
+    }
+}
+
+int program(int argc, string[] argv) {
+  var tomato = "TOMATO";
+  var orating = "ORATING";
+  print_string(lcs(5, 6, tomato, orating));
+  return 0;
+}
+

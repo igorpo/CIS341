@@ -1,0 +1,12 @@
+int program (int argc, string[] argv) {
+  var a = new int[][]{new int[]{0,1,2,3},
+                      new int[]{4,5,6,7},
+                      new int[]{8,9,10,11}};
+  var s=0;
+  for(var i=0; i<3; i=i+1;) {
+    for(var j=0; j<4; j=j+1;) {
+      s=s+a[i][j];
+    }
+  }
+  return s;
+}

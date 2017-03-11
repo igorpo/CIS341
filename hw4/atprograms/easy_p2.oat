@@ -1,0 +1,5 @@
+int f ( int x ) {
+  var x = 0;
+  x = x + x - x * x >> x << x [|] x [&] -~x >>> x;
+  return x;
+}

@@ -1,0 +1,149 @@
+global meaning_of_life = 42;
+global kesha_to_fling = true;
+global professor = "Zdancewic!";
+global global_arr = int[]{1, 1, 2, 3, 5, 8, 13};
+global null_arr = int[] null;
+global ideal_341_midterm_score = int[]{100};
+global actual_341_midterm_score = int[]{0};
+
+int four () {
+  var hakuna_matata = "Meaning of Life";
+  var what_is_the = meaning_of_life;
+  var what_rhymes_with_moore = meaning_of_life - global_arr[5] * global_arr[4] + global_arr[2];
+  return 0 + what_rhymes_with_moore;
+}
+
+int[] asian_brother_of_foo_named_fui (string s, bool b, int i) {
+  var fui = global_arr;
+  return fui;
+}
+
+void dfs (int[][] arr, int[][] visited, int row, int col, int i, int j) {
+  if (i - 1 >= 0) {
+    if (visited[i - 1][j] != 1) {
+      visited[i - 1][j] = 1;
+
+      if (arr[i - 1][j] == 1) {
+        dfs(arr, visited, row, col, i - 1, j);
+      }
+    }
+  }
+
+  if (i + 1 < row) {
+    if (visited[i + 1][j] != 1) {
+      visited[i + 1][j] = 1;
+
+      if (arr[i + 1][j] == 1) {
+        dfs(arr, visited, row, col, i + 1, j);
+      }
+    }
+  }
+
+  if (j - 1 >= 0) {
+    if (visited[i][j - 1] != 1) {
+      visited[i][j - 1] = 1;
+
+      if (arr[i][j - 1] == 1) {
+        dfs(arr, visited, row, col, i, j - 1);
+      }
+    }
+  }
+
+  if (j + 1 < col) {
+    if (visited[i][j + 1] != 1) {
+      visited[i][j + 1] = 1;
+
+      if (arr[i][j + 1] == 1) {
+        dfs(arr, visited, row, col, i, j + 1);
+      }
+    }
+  }
+
+  return;
+}
+
+int connected (int[][] arr, int row, int col) {
+  var visited = new int[][row];
+  for (var i=0; i < row; i=i+1;) { visited[i] = new int[col]; }
+  var counter = 0;
+
+  for (var i = 0; i < row; i = i + 1;) {
+    var j = 0;
+    
+    while (j < col) {
+    if (visited[i][j] == 0) {
+      visited[i][j] = 1;
+      
+      if (arr[i][j] == 1) {
+        counter = counter + 1;
+
+        dfs(arr, visited, row, col, i, j);
+      }
+    }
+
+    j = j + 1;
+    }
+  }
+
+  return counter;
+}
+
+int program (int argc, string[] argv) {
+  var territory_a = new int[][]{new int[]{1, 0, 1, 0},
+                                new int[]{1, 1, 0, 1},
+                                new int[]{1, 0, 1, 1}, 
+                                new int[]{0, 1, 1, 0}};
+  var territory_b = new int[][]{new int[]{0, 0, 1, 0, 1},
+                                new int[]{0, 1, 1, 0, 1},
+                                new int[]{1, 1, 1, 1, 1}};
+  var territory_c = new int[][]{new int[]{1, 0, 1},
+                                new int[]{0, 1, 0},
+                                new int[]{1, 0, 1}};
+
+  var none_conquered = new int[][four()];
+  for (var i=0; i < four(); i=i+1;) { 
+    none_conquered[i] = new int[2];
+    for (var j=0; j < 2; j=j+1;) { 
+      none_conquered[i][j] = actual_341_midterm_score[0]; 
+    }
+  }
+
+  var all_conquered = new int[][6];
+  for (var i2=0; i2 < 6; i2=i2+1;) {
+    all_conquered[i2] = new int[6]; 
+    for (var i21=0; i21 < 6; i21=i21+1;) { all_conquered[i2][i21] = i2 * 0 + 1; }
+  }
+
+  var island = new int[][] {new int[]{}};
+  var emptyland = new int[][1];
+  for (var i3=0; i3 < 1; i3=i3+1;) {
+    emptyland[i3] = new int[1];
+    for (var i31=0; i31 < 1; i31=i31+1;) {
+      emptyland[i3][i31] = asian_brother_of_foo_named_fui(professor,kesha_to_fling,ideal_341_midterm_score[0])[1];
+    }
+  }
+
+
+  all_conquered = all_conquered;
+  var temp = island;
+  island = emptyland;
+  emptyland = temp;
+
+  print_string("My name is Jeff...\n");
+
+  var a = connected(territory_a, 4, 4);
+  var b = connected(territory_b, 3, 5);
+  var c = connected(territory_c, 3, 3);
+  var none = connected(none_conquered, 4, 2);
+  var all = connected(all_conquered, 6, 6);
+  var i = connected(island, 1, 1);
+  var e = connected(emptyland, 0, 0);
+  
+  if (a == 3 & b == 1 & c == 5 & none == 0 & all == 1 & i == 1 & e == 0) {
+    print_string("Charizard is the BEST Pokemon ever!!!");
+  }
+
+  var sum = a + b + c + none + all + i + e;
+
+  return sum;
+}

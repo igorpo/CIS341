@@ -1,0 +1,11 @@
+int program (int argc, string[] argv) {
+  var x = 100 >> 3;
+  var y = 100 << 3;
+ 
+  if (x-y <= 0) {
+    return -x-y;
+  } else {
+    return x-y;
+  }
+
+}

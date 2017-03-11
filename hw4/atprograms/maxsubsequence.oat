@@ -1,0 +1,26 @@
+int maxsum(int[] arr, int size) {
+    var maxarr = new int[size];
+    var maxs = 0;
+    maxarr[0] = arr[0];
+    for(var i = 0; i < size; i = i+1;){
+        for(var j = 0; j < i; j=j+1;){
+            if(arr[i] > arr[j] & maxarr[i] < maxarr[j] + arr[i]){
+                maxarr[i] = maxarr[j] + arr[i];
+            }
+        }
+        if(maxs < maxarr[i]){
+            maxs = maxarr[i];
+        }
+    } 
+    return maxs;
+}
+
+int program (int argc, string[] argv) {
+    var array = new int[]{1,101,2,3,101,4,5};
+    var max_ans = maxsum(array, 7);
+    return max_ans;
+}
+
+
+
+

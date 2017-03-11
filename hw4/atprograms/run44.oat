@@ -1,0 +1,19 @@
+global str = string[][][][][][][][][][] null;
+
+int program (int argc, string[] argv) {
+  str                            = new string[][][][][][][][][][1];
+  str[0]                         = new string[][][][][][][][][1];
+  str[0][0]                      = new string[][][][][][][][1];
+  str[0][0][0]                   = new string[][][][][][][1];
+  str[0][0][0][0]                = new string[][][][][][1];
+  str[0][0][0][0][0]             = new string[][][][][1];
+  str[0][0][0][0][0][0]          = new string[][][][1];
+  str[0][0][0][0][0][0][0]       = new string[][][1];
+  str[0][0][0][0][0][0][0][0]    = new string[][1];
+  str[0][0][0][0][0][0][0][0][0] = new string[1];
+
+  str[0][0][0][0][0][0][0][0][0][0] = "hello";
+  print_string (str[0][0][0][0][0][0][0][0][0][0]);
+  return 0;
+}
+

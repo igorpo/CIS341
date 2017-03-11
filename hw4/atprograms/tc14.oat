@@ -1,0 +1,4 @@
+int program (int argc, string[] argv) {
+  int[] a = {"hello"};
+  return 0;
+}

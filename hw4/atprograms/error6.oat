@@ -1,0 +1,4 @@
+int f () {return -9;}
+
+int x = 0;
+return x;

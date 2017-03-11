@@ -1,0 +1,5 @@
+int program (int argc, string[] argv) {
+  int[] arr = alloc_array (10);
+  return arr[10];
+}
+

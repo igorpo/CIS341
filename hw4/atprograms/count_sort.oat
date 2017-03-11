@@ -1,0 +1,59 @@
+
+int min(int[] arr, int len) {
+  var min = arr[0];
+  for (var i = 0; i < len; i = i + 1;) {
+    if (arr[i] < min) {
+        min = arr[i];
+    }
+  }
+  return min;
+}
+
+int max(int[] arr, int len) {
+  var max = arr[0];
+  for (var i = 0; i < len; i = i + 1;) {
+    if (arr[i] > max) {
+        max = arr[i];
+    }
+  }
+  return max;
+}
+
+int[] count_sort(int[] arr, int len) {
+  var min = min(arr, len);
+  var max = max(arr, len);
+
+  var counts = new int[max - min + 1];
+  
+  for (var i = 0; i < len; i = i + 1;) {
+    counts[arr[i] - min] = counts[arr[i] - min] + 1;
+  }
+
+  var i = min;
+  var j = 0;
+
+  var out = new int[len];
+
+  while (i <= max) {
+
+    if (counts[i - min] > 0) {
+      out[j] = i;
+      counts[i - min] = counts[i - min] - 1;
+      j = j + 1;
+    } else {
+      i = i + 1;
+    }
+  }
+  return out;
+}
+
+int program(int argc, string[] argv) {
+  var arr = new int[]{65, 70, 72, 90, 65, 65, 69, 89, 67};
+  var len = 9;
+
+  print_string(string_of_array(arr));
+  print_string("\n");
+  var sorted = count_sort(arr, len);
+  print_string(string_of_array(sorted));
+  return 0;
+}

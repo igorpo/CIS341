@@ -1,0 +1,5 @@
+int f() {return 19;}
+int program (int argc, string[] argv) {
+  int[] a = {1, 100, 19};
+  return a[2];
+}

@@ -1,0 +1,40 @@
+/* This is a test case: level 0 
+
+   /* level 1 */
+
+
+   /* level 1
+      /* level 2 */
+   */
+
+   "This is a commented string."
+*/
+
+string f ( ) {
+  var s = 
+    new string[][]
+        {
+          new string []{ 
+            "s00:\n+\n=2*\n",
+            "s01:this is not a comment in string.*",
+            "s02:\"\\t\\n\\\\?\""
+          },
+          new string[]{
+            "s10:\133\134",
+            "s11",
+            "s12"
+          }
+        };
+
+  return s[0][1];
+}
+
+int[][] g (int [][] x) {
+  var y = new int[][]{ new int[]{0, 1}, new int[]{2, 3} };
+  var i = 0;
+
+  x[0][0] = i + y[1][1]; /* + g(x)[1][0]; */
+  i = -!~x[0][0] ; /* comments */
+
+  return x;
+}

@@ -1,0 +1,38 @@
+int getminindex(int[] a, int s, int b)
+{
+  var i=s;
+  var min=a[s];
+  var mi=s;
+  for(; i < b; i=i+1;)
+  {
+    if ( a[i] < min ) { min = a[i]; mi = i; }
+  }
+  return mi;
+}
+ 
+void selectionsort(int[] a, int s)
+{
+  var t=0;
+  var mi=0;
+  for(var i=0; i<s ; i=i+1;)
+  {
+     mi = getminindex(a, i, s);
+     t = a[i]; 
+     a[i] = a[mi]; 
+     a[mi] = t; 
+  }
+  return;
+}
+ 
+int program (int argc, string[] argv) {
+
+   var ar = new int[]{ 5, 200, 1, 65, 30, 99, 2, 0 };
+ 
+   selectionsort(ar, 8);
+   for(var i=0; i<8; i=i+1;)
+   {
+     print_int(ar[i]);
+   }
+ 
+   return 0;
+}

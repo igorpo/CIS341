@@ -1,0 +1,21 @@
+global i = 42;
+
+int f(int x) {
+  return x;
+}
+
+int g(int[] y) {
+  return y[2];
+}
+
+int program (int argc, string[] argv) {
+  var garr = new int[][]{new int[]{1,2}, new int[]{3,4}};
+  var arr = new int[]{1, 2, 3, 4};
+  var p=0;
+
+  for (var j=0; j<100; j=j+1; ) {
+   p=p+1;
+  }
+ 
+  return g(arr) + f(i) + f(arr[3]) + f(garr[1][1]) + f(p);
+}

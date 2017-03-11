@@ -1,0 +1,30 @@
+int sieve(int n) {
+  var arr = new bool[n];
+  for (var i=0; i < n; i=i+1;) { arr[i] = true; }
+
+  arr[0] = false;
+  arr[1] = false;
+
+  for(var i = 0; i < n; i=i+1;) {
+    if(arr[i]){
+      for(var j = i * 2; j < n; j=j+i;){
+        arr[j] = false;
+      }
+    }
+  }
+
+  var count = 0;
+  for(var i = 0; i < n; i=i+1;){
+    if(arr[i]) {
+      count = count + 1;
+    }
+  }
+
+  return count;
+
+}
+
+int program(int argc, string[] argv) {
+  var n = 100;
+  return sieve(n);
+}

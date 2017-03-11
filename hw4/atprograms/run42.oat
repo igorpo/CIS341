@@ -1,0 +1,16 @@
+int program(int argc, string[] argv) {
+  var a1=new int[][3];
+  var a2=new int[][3];
+  var a3=new int[][3];
+  var a4=new int[][3];
+  var a5=new int[3];
+  a2[0] = a5;
+  a2[0][0] = 2;
+  a1 = a2;
+  a3 = a1;
+  a1 = a4;
+  a2 = a3;
+  a4 = a2;
+  a3 = a4;
+  return a3[0][0];
+}

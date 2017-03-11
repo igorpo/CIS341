@@ -1,0 +1,5 @@
+int program (int argc, string[] argv) {
+  string str = string_of_array (new int[3]{ i => 110 });
+  print_string (str);
+  return 0;
+}

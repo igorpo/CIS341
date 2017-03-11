@@ -1,0 +1,5 @@
+
+int program (int argc, string[] argv) {
+  var i= new int[]{99,0};
+  return i[0];
+}
