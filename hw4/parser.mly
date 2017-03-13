@@ -97,7 +97,7 @@ decl:
   | GLOBAL name=IDENT EQ init=gexp SEMI
     { Gvdecl (loc $startpos $endpos { name; init }) }
   | rtyp=ty name=IDENT LPAREN args=arglist RPAREN body=block
-    { Gfdecl (loc $startpos $endpos { rtyp; name; args; body }) }
+    { Gfdecl (loc $startpos $endpos { rtyp; name; args; body }) } 
 
 arglist:
   | l=separated_list(COMMA, pair(ty,IDENT)) { l }
@@ -170,10 +170,6 @@ exp:
   | g=gexp              { g }
   | LPAREN e=exp RPAREN { e } 
 
-exp_opt:
-  | w=WHITESPACE { None }
-  | e=exp { Some e }
-
 vdecl:
   | VAR id=IDENT EQ init=exp { (id, init) }
 
@@ -188,14 +184,10 @@ stmt:
   | ifs=if_stmt         { ifs }
   | RETURN SEMI         { loc $startpos $endpos @@ Ret(None) }
   | RETURN e=exp SEMI   { loc $startpos $endpos @@ Ret(Some e) }
-  | FOR LPAREN v=vdecls SEMI e=exp_opt SEMI s=stmt_opt RPAREN b=block
-                    { loc $startpos $endpos @@ For(v, e, s, b) }
+  | FOR LPAREN v=vdecls SEMI e=exp SEMI s=stmt RPAREN b=block
+                    { loc $startpos $endpos @@ For(v, Some e, Some s, b) }
   | WHILE LPAREN e=exp RPAREN b=block  
                         { loc $startpos $endpos @@ While(e, b) } 
-
-stmt_opt:
-  | w=WHITESPACE { None }
-  | s=stmt { Some s }
 
 block:
   | LBRACE stmts=list(stmt) RBRACE { stmts }

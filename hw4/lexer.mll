@@ -39,6 +39,7 @@
   ("var", VAR);
   ("true", TRUE);
   ("false", FALSE);
+  ("bool", TBOOL);
   ("global", GLOBAL);
 
   (* Symbols *)
@@ -146,7 +147,7 @@ rule token = parse
   | ';' | ',' | '{' | '}' | '+' | '-' | '*' | '=' | "==" 
   | "!=" | '!' | '~' | '(' | ')' | '[' | ']' | "<<" | ">>"
   | ">>>" | '<' | "<=" | '>' | ">=" | "!=" | '&'| '|' | "[&]"
-  | "[|]"
+  | "[|]" | "new" | "true" | "false" | "var" | "global"
 
     { create_token lexbuf }
 
