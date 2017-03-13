@@ -149,6 +149,15 @@ lhs:
   | id=IDENT            { loc $startpos $endpos @@ Id id }
   | e=exp LBRACKET i=exp RBRACKET
                         { loc $startpos $endpos @@ Index (e, i) }
+
+exp_opt:
+  | (* empty *) { None }
+  | e=exp { Some e }
+
+stmt_opt:
+  | (* empty *) { None }
+  | s=stmt { Some s }
+
 exp:
   | id=IDENT            { loc $startpos $endpos @@ Id id }
   | i=INT               { loc $startpos $endpos @@ CInt i }
@@ -184,8 +193,8 @@ stmt:
   | ifs=if_stmt         { ifs }
   | RETURN SEMI         { loc $startpos $endpos @@ Ret(None) }
   | RETURN e=exp SEMI   { loc $startpos $endpos @@ Ret(Some e) }
-  | FOR LPAREN v=vdecls SEMI e=exp SEMI s=stmt RPAREN b=block
-                    { loc $startpos $endpos @@ For(v, Some e, Some s, b) }
+  | FOR LPAREN v=vdecls SEMI e=exp_opt SEMI s=stmt_opt RPAREN b=block
+                    { loc $startpos $endpos @@ For(v, e, s, b) }
   | WHILE LPAREN e=exp RPAREN b=block  
                         { loc $startpos $endpos @@ While(e, b) } 
 
