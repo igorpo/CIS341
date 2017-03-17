@@ -158,15 +158,7 @@ stmt_opt:
   | (* empty *) { None }
   | s=stmt { Some s }
 
-exp:
-  | id=IDENT            { loc $startpos $endpos @@ Id id }
-  | i=INT               { loc $startpos $endpos @@ CInt i }
-  | s=STRING            { loc $startpos $endpos @@ CStr s }
-  | t=ty NULL           { loc $startpos $endpos @@ CNull t }
-  | t=TRUE            { loc $startpos $endpos @@ CBool true }
-  | f=FALSE            { loc $startpos $endpos @@ CBool false }
-  | e=exp LBRACKET i=exp RBRACKET
-                        { loc $startpos $endpos @@ Index (e, i) }
+exp:            
   | id=IDENT LPAREN es=separated_list(COMMA, exp) RPAREN
                         { loc $startpos $endpos @@ Call (id,es) }
   | NEW t=ty LBRACKET RBRACKET LBRACE es=separated_list(COMMA, exp) RBRACE
