@@ -201,13 +201,16 @@ and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : stream =
     ) (c,[]) stmts
 
 
+let cmp_global_ctxt_hlpr (c:Ctxt.t) (p:Ast.decl) : Ctxt.t =
+  c
+
 (* Populate a context with bindings for global variables and functions,
    mapping OAT identifiers to LLVMlite gids and their types.
 
    Only a small subset of OAT expressions can be used as global initializers
    in well-formed programs (The constructors starting with C). *)
 let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
-  failwith "cmp_global_ctxt unimplemented"
+  List.fold_left cmp_global_ctxt_hlpr c p
 
 
 (* Compile a function declaration in global context c. Return the LLVMlite cfg
@@ -220,8 +223,27 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
    3. Extend the context with bindings for function variables
    3. Compile the body of the function using cmp_block
    4. Use cfg_of_stream to produce a LLVMlite cfg from 
+
+
+OAT:
+   type fdecl =
+  { rtyp : ty
+  ; name : id
+  ; args : (ty * id) list
+  ; body : block        
+  }
+
+LLVM:
+  fdecl = { fty: fty; param: uid list; cfg: cfg }
+  fty = ty list * ty 
+
+cfg_of_stream -> Ll.cfg * (Ll.gid * Ll.gdecl) list  =
+cfg, rest = cfg_of_stream (lift [out llvm code])
+return {fty, uid list, cfg} * rest
+
  *)
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
+  
   failwith "cmp_fdecl not implemented"
 
 
@@ -235,9 +257,40 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
 
    - OAT arrays are always handled via pointers. A global array of arrays will
      be an array of pointers to arrays emitted as additional global declarations
+
+    gdecl = ty * ginit
+
+type ty =
+  | Void                            (* mix of unit/bottom from C *)
+  | I1 | I8 | I64                   (* integer types             *)
+  | Ptr of ty                       (* t*                        *)
+  | Struct of ty list               (* { t1, t2, ... , tn }      *)
+  | Array of int * ty               (* [ NNN x t ]               *)
+  | Fun of fty                      (* t1, ..., tn -> tr         *)
+  | Namedt of tid                   (* named type aliases        *)
+
+    type ginit = 
+  | GNull                     (* null literal             *)
+  | GGid of gid               (* reference another global *)
+  | GInt of int64             (* global integer value     *)
+  | GString of string         (* constant global string   *)
+  | GArray of gdecl list      (* global array             *)
+  | GStruct of gdecl list     (* global struct            *)
+
  *)
+
+let bool_to_int64 (b:bool) : int64 =
+  if b then 1L else 0L 
+
 let rec cmp_gexp (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
-  failwith "cmp_init not implemented"
+  begin match e.elt with 
+  | CNull t -> ((cmp_ty t, Ll.GNull),[])
+  | CBool b -> ((Ll.I1, Ll.GInt(bool_to_int64 b)),[])
+  | CInt i -> ((Ll.I64, Ll.GInt i),[])
+  | CStr i -> ((Ll.Ptr Ll.I8, Ll.GString i),[])
+  (* | CArr (t, e_list) -> ((cmp_ty t, Ll.GArray ), List.map cmp_gexp e_list) *)
+  | _ -> failwith "other case"
+  end
 
 
 (* Oat initial context ------------------------------------------------------ *)
