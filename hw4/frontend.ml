@@ -191,7 +191,16 @@ failwith "cmp_exp unimplemented"
 
  *)
 let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
-  failwith "cmp_stmt not implemented"
+  begin match stmt.elt with
+  | Ret e_opt -> 
+    begin match e_opt with
+    | Some s -> let typ, opr, str = cmp_exp c s in 
+                (c, str >@ [T (Ll.Ret (typ, Some opr))])
+    | None -> (c, [T (Ll.Ret (Void, None))])
+    end
+  | _ -> failwith ""
+  end
+  
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : stream =
@@ -235,16 +244,33 @@ OAT:
 
 LLVM:
   fdecl = { fty: fty; param: uid list; cfg: cfg }
+  
   fty = ty list * ty 
 
-cfg_of_stream -> Ll.cfg * (Ll.gid * Ll.gdecl) list  =
-cfg, rest = cfg_of_stream (lift [out llvm code])
-return {fty, uid list, cfg} * rest
-
+cfg_of_stream(elt list) -> Ll.cfg * (Ll.gid * Ll.gdecl) list
+LLVM_CODE = []
+fty = ([args[0], ... , ...],  rtyp) 
+uid_list = [args[1], ... , ...]
+cfg, rest = cfg_of_stream (lift LLVM_CODE)
+return {fty, uid_list, cfg} * rest
  *)
+
+type uid_l = Ll.uid list
+type ty_l = Ll.ty list
+
+let cmp_fdecl_helper (a:Ctxt.t * uid_l * ty_l * stream) (d:ty * id) : Ctxt.t * uid_l * ty_l * stream =
+  a
+
+
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
-  
-  failwith "cmp_fdecl not implemented"
+  let args = f.elt.args in
+  let rtyp = f.elt.rtyp in
+  let name = f.elt.name in
+  let ll_body = cmp_block c (cmp_ty rtyp) f.elt.body in
+  let _, uid_list, ty_list, ll_code = List.fold_left cmp_fdecl_helper (c, [], [], []) args in
+  let cfg, rest = cfg_of_stream (ll_code >@ ll_body) in
+  let fty = (ty_list, cmp_ty rtyp) in
+  ({ fty=fty; param=uid_list; cfg=cfg }, rest)
 
 
 (* Compile a global initializer, returning the resulting LLVMlite global
