@@ -139,7 +139,62 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
     [ arr_id, Call(arr_ty, Gid "oat_alloc_array", [I64, size])
     ; ans_id, Bitcast(arr_ty, Id arr_id, ans_ty) ]
 
+(* 
+  typing of result expression 
+  | CNull of ty                         (* null literal for any TRef *)
+  | CBool of bool                       (* bool literal *)
+  | CInt of int64                       (* int literal *)
+  | CStr of string                      (* string literal *)
+  | CArr of ty * exp node list          (* array literal *)
+  | NewArr of ty * exp node             (* zero-initialized arrays *)
+  | Id of id                            (* identifiers *)
+  | Index of exp node * exp node        (* index into an array *)
+  | Call of id * exp node list          (* function call *)
+  | Bop of binop * exp node * exp node  (* operations of two arguments *)
+  | Uop of unop * exp node 
+*)
+let rec expr_type (exp: Ast.exp) : Ast.ty = 
+  begin match exp with 
+  | CNull _ -> TVoid
+  | CBool _ -> TBool
+  | CInt _ -> TInt
+  | CStr _ -> TRef (RString)
+  | CArr (t, _) -> t 
+  | NewArr (t, _) -> t
+  | Id _ -> TRef (RString) (* string ??? *)
+  | Index (e1, _) -> expr_type e1.elt (* e1[e2] e1 should be type? *)
+  | Call (id, exp_n_list) -> (* how do you find return type of func? *) failwith "IDK bruh"
+  | Bop (b, _, _) ->
+    begin match b with 
+    | Add | Sub | Mul | IAnd | IOr | Shl | Shr | Sar -> TInt
+    | _ -> TBool
+    end
+  | Uop (u, _) ->
+    begin match u with
+    | Neg | Bitnot -> TInt
+    | _ -> TBool
+    end
+  end
 
+let cmp_bop (b: Ast.binop) (op1: Ll.operand) (op2: Ll.operand) (t: Ll.ty) : Ll.insn =
+  begin match b with 
+  | Add -> Ll.Binop (Ll.Add, t, op1, op2)
+  | Sub -> Ll.Binop (Ll.Sub, t, op1, op2)
+  | Mul -> Ll.Binop (Ll.Mul, t, op1, op2)
+  | Eq -> Ll.Icmp (Ll.Eq, t, op1, op2)
+  | Neq -> Ll.Icmp (Ll.Ne, t, op1, op2)
+  | Lt -> Ll.Icmp (Ll.Slt, t, op1, op2)
+  | Lte -> Ll.Icmp (Ll.Sle, t, op1, op2)
+  | Gt -> Ll.Icmp (Ll.Sgt, t, op1, op2)
+  | Gte -> Ll.Icmp (Ll.Sge, t, op1, op2)
+  | And -> Ll.Binop (Ll.And, t, op1, op2)
+  | Or -> Ll.Binop (Ll.Or, t, op1, op2)
+  | IAnd -> Ll.Binop (Ll.And, t, op1, op2) (* bitwise? Ll support? *)
+  | IOr -> Ll.Binop (Ll.Or, t, op1, op2) (* bitwise? Ll support? *)
+  | Shl -> Ll.Binop (Ll.Shl, t, op1, op2)
+  | Shr -> Ll.Binop (Ll.Lshr, t, op1, op2)
+  | Sar -> Ll.Binop (Ll.Ashr, t, op1, op2)
+  end
 
 (* Compile an expression exp in context c, outputting the Ll operand that will
    recieve the value of the expression, and the stream of instructions
@@ -162,7 +217,15 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
 *)
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
-failwith "cmp_exp unimplemented"    
+  begin match exp.elt with 
+  | Bop (b, e1, e2) -> 
+    let t = expr_type (Bop (b, e1, e2)) in 
+    let id = gensym "" in
+    let t1, op1, strm1 = cmp_exp c e1 in 
+    let t2, op2, strm2 = cmp_exp c e2 in  
+    (cmp_ty t, Ll.Id id, strm2 >@ strm1 >@ [I (id, cmp_bop b op1 op2 t1)])
+  | _ -> failwith "This expr is not implemented yet bruh"
+  end   
 
 (* Compile a statement in context c with return typ rt. Return a new context,
    possibly extended with new local bindings, and the instruction stream
@@ -194,11 +257,22 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
   begin match stmt.elt with
   | Ret e_opt -> 
     begin match e_opt with
-    | Some s -> let typ, opr, str = cmp_exp c s in 
-                (c, str >@ [T (Ll.Ret (typ, Some opr))])
-    | None -> (c, [T (Ll.Ret (Void, None))])
+    | Some s -> 
+      let typ, opr, strm = cmp_exp c s in 
+      if rt = typ then
+        (c, strm >@ [T (Ll.Ret (typ, Some opr))])
+      else 
+        failwith "Incompatible return types"
+    | None -> 
+      if rt = Void then (c, [T (Ll.Ret (Void, None))])
+      else failwith "Expected a void return type"
     end
-  | _ -> failwith ""
+  | Decl vd ->
+    let id, expr = vd in 
+    let typ, opr, strm = cmp_exp c expr in
+    let new_c = Ctxt.add c id (typ, opr) in
+    (new_c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))] >@ [I (id, Ll.Alloca typ)])
+  | _ -> failwith "Not implemented yet bruh"
   end
   
 
