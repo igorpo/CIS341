@@ -214,7 +214,23 @@ let cmp_bop (b: Ast.binop) (op1: Ll.operand) (op2: Ll.operand) (t: Ll.ty) : Ll.i
      that compiles an expression and optionally inserts a bitcast to the
      desired Ll type. This is useful for dealing with OAT identifiers that
      correspond to gids that don't quite have the type you want
+
+  | CNull of ty                         (* null literal for any TRef *)
+  | CBool of bool                       (* bool literal *)
+  | CInt of int64                       (* int literal *)
+  | CStr of string                      (* string literal *)
+  | CArr of ty * exp node list          (* array literal *)
+  | NewArr of ty * exp node             (* zero-initialized arrays *)
+  | Id of id                            (* identifiers *)
+  | Index of exp node * exp node        (* index into an array *)
+  | Call of id * exp node list          (* function call *)
+  | Bop of binop * exp node * exp node  (* operations of two arguments *)
+  | Uop of unop * exp node    
 *)
+
+
+(* let cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream =
+  failwith "" *)
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   begin match exp.elt with 
@@ -224,7 +240,16 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let t1, op1, strm1 = cmp_exp c e1 in 
     let t2, op2, strm2 = cmp_exp c e2 in  
     (cmp_ty t, Ll.Id id, strm2 >@ strm1 >@ [I (id, cmp_bop b op1 op2 t1)])
-  | _ -> failwith "This expr is not implemented yet bruh"
+  | CNull t -> failwith "CNull"
+  | CBool b -> failwith "CBool"
+  | CInt i -> (Ll.I64, Ll.Const i,[])
+  | CStr s -> failwith "CStr"
+  | CArr (typ, exp_node_list) -> failwith "CArr"
+  | NewArr (typ, exp_node) -> failwith "NewArr"
+  | Id i -> failwith "Id"
+  | Index (exp_node1, exp_node2) -> failwith "Index" 
+  | Call (i, exp_node_list) -> failwith "Call"
+  | Uop (unop1, exp_node) -> failwith "Uop"
   end   
 
 (* Compile a statement in context c with return typ rt. Return a new context,
@@ -256,6 +281,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
   begin match stmt.elt with
   | Ret e_opt -> 
+    (* Printf.printf "Ret e_opt";   *)
     begin match e_opt with
     | Some s -> 
       let typ, opr, strm = cmp_exp c s in 
@@ -268,11 +294,17 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       else failwith "Expected a void return type"
     end
   | Decl vd ->
+    (* Printf.printf "Decl vd";   *)
     let id, expr = vd in 
     let typ, opr, strm = cmp_exp c expr in
     let new_c = Ctxt.add c id (typ, opr) in
     (new_c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))] >@ [I (id, Ll.Alloca typ)])
-  | _ -> failwith "Not implemented yet bruh"
+  | Assn (exp_node1, exp_node2) -> failwith "Assn"
+  | SCall (i, exp_node_list) -> failwith "SCall"
+  | If (exp_node1, block1, block2) -> failwith "If"
+  | For (vd_list, exp_node_option,
+           stmt_node_option, block1) -> failwith "For"
+  | While (exp_node, block1) -> failwith "While"
   end
   
 
@@ -339,7 +371,7 @@ let cmp_fdecl_helper (a:Ctxt.t * uid_l * ty_l * stream) (d:ty * id) : Ctxt.t * u
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
   let args = f.elt.args in
   let rtyp = f.elt.rtyp in
-  let name = f.elt.name in
+  let _ = f.elt.name in
   let ll_body = cmp_block c (cmp_ty rtyp) f.elt.body in
   let _, uid_list, ty_list, ll_code = List.fold_left cmp_fdecl_helper (c, [], [], []) args in
   let cfg, rest = cfg_of_stream (ll_code >@ ll_body) in
