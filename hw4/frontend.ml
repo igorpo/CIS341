@@ -80,6 +80,11 @@ module Ctxt = struct
 
 end
 
+
+(* Helper function *)
+let bool_to_int64 (b:bool) : int64 =
+  if b then 1L else 0L 
+
 (* compiling OAT types ------------------------------------------------------ *)
 
 (* The mapping of source types onto LLVMlite is straightforward. Booleans and ints
@@ -163,7 +168,6 @@ let rec expr_type (exp: Ast.exp) : Ast.ty =
   | NewArr (t, _) -> t
   | Id _ -> TRef (RString) (* string ??? *)
   | Index (e1, _) -> expr_type e1.elt (* e1[e2] e1 should be type? *)
-  | Call (id, exp_n_list) -> (* how do you find return type of func? *) failwith "IDK bruh"
   | Bop (b, _, _) ->
     begin match b with 
     | Add | Sub | Mul | IAnd | IOr | Shl | Shr | Sar -> TInt
@@ -174,6 +178,7 @@ let rec expr_type (exp: Ast.exp) : Ast.ty =
     | Neg | Bitnot -> TInt
     | _ -> TBool
     end
+  | _ -> failwith "unmatched"
   end
 
 let cmp_bop (b: Ast.binop) (op1: Ll.operand) (op2: Ll.operand) (t: Ll.ty) : Ll.insn =
@@ -229,6 +234,9 @@ let cmp_bop (b: Ast.binop) (op1: Ll.operand) (op2: Ll.operand) (t: Ll.ty) : Ll.i
 *)
 
 
+type arg_list = (Ll.ty * Ll.operand) list
+
+  
 (* let cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream =
   failwith "" *)
 
@@ -240,17 +248,27 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let t1, op1, strm1 = cmp_exp c e1 in 
     let t2, op2, strm2 = cmp_exp c e2 in  
     (cmp_ty t, Ll.Id id, strm2 >@ strm1 >@ [I (id, cmp_bop b op1 op2 t1)])
-  | CNull t -> failwith "CNull"
-  | CBool b -> failwith "CBool"
+  | CNull t -> (cmp_ty t, Ll.Null,[])
+  | CBool b -> (Ll.I1, Ll.Const (bool_to_int64 b),[])
   | CInt i -> (Ll.I64, Ll.Const i,[])
   | CStr s -> failwith "CStr"
   | CArr (typ, exp_node_list) -> failwith "CArr"
   | NewArr (typ, exp_node) -> failwith "NewArr"
   | Id i -> failwith "Id"
   | Index (exp_node1, exp_node2) -> failwith "Index" 
-  | Call (i, exp_node_list) -> failwith "Call"
+  (* let lookup_function (id:Ast.id) (c:t) : Ll.fty * Ll.operand = *)
+  | Call (i, exp_node_list) -> 
+    let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
+    let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
+    let lbl = gensym i in
+    (typ, ll_op, streams >@ [I (lbl, Ll.Call (typ, ll_op, ty_op_list))])
   | Uop (unop1, exp_node) -> failwith "Uop"
   end   
+
+and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : Ctxt.t * arg_list * stream =
+  let ctxt, args, str = c in
+  let arg_t, arg_o, arg_s = cmp_exp ctxt a in
+  (ctxt, args @ [(arg_t, arg_o)], str >@ arg_s)
 
 (* Compile a statement in context c with return typ rt. Return a new context,
    possibly extended with new local bindings, and the instruction stream
@@ -410,9 +428,6 @@ type ty =
   | GStruct of gdecl list     (* global struct            *)
 
  *)
-
-let bool_to_int64 (b:bool) : int64 =
-  if b then 1L else 0L 
 
 let rec cmp_gexp (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
   begin match e.elt with 
