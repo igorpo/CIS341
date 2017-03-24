@@ -122,8 +122,8 @@ let executed_oat_file tests =
 let easiest_tests = [
   (* ("atprograms/easyrun2.oat", "", "35");
   ("atprograms/easyrun1.oat", "", "17"); *)
-  (* ("atprograms/ss.oat", "", "17"); *)
-  ("atprograms/easyrun3.oat", "", "73");
+  ("atprograms/ss.oat", "", "17");
+  (* ("atprograms/easyrun3.oat", "", "73"); *)
   (* ("atprograms/easyrun4.oat", "", "6");
   ("atprograms/easyrun5.oat", "", "212");
   ("atprograms/easyrun6.oat", "", "9");

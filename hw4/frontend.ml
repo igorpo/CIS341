@@ -216,9 +216,7 @@ let cmp_bop (b: Ast.binop) (op1: Ll.operand) (op2: Ll.operand) (t: Ll.ty) : Ll.i
 
    - we found it useful to write a helper function 
      cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream
-     that compiles an expression 
-
-     and optionally inserts a bitcast to the
+     that compiles an expression and optionally inserts a bitcast to the
      desired Ll type. This is useful for dealing with OAT identifiers that
      correspond to gids that don't quite have the type you want
 
@@ -244,14 +242,8 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | Bop (b, e1, e2) -> 
     let t = expr_type (Bop (b, e1, e2)) in 
     let id = gensym "bop" in
-    let t1_ty, t1_op, t1_strm = cmp_exp c e1 in
-    let t1, op1, strm1 = begin match t1_ty with
-    | Ptr p -> 
-      let loaded_t1 = gensym "" in
-      (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
-    | _ -> (t1_ty, t1_op, t1_strm)
-    end in
-    let t2, op2, strm2 = cmp_exp c e2 in
+    let t1, op1, strm1 = load_helper @@ cmp_exp c e1 in
+    let _, op2, strm2 = load_helper @@ cmp_exp c e2 in
     (cmp_ty t, Ll.Id id, strm2 >@ strm1 >@ [I (id, cmp_bop b op1 op2 t1)])
   | CNull t -> (cmp_ty t, Ll.Null,[])
   | CBool b -> (Ll.I1, Ll.Const (bool_to_int64 b),[])
@@ -259,11 +251,9 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CStr s -> failwith "CStr"
   | CArr (typ, exp_node_list) -> failwith "CArr"
   | NewArr (typ, exp_node) -> failwith "NewArr"
-  (* let lookup (id:Ast.id) (c:t) : Ll.ty * Ll.operand = *)
   | Id i -> let typ, opr = Ctxt.lookup i c in
     (Ll.Ptr typ, Ll.Id i, [])
   | Index (exp_node1, exp_node2) -> failwith "Index" 
-  (* let lookup_function (id:Ast.id) (c:t) : Ll.fty * Ll.operand = *)
   | Call (i, exp_node_list) -> 
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
     let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
@@ -274,6 +264,15 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
 (* and cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream =
   failwith "" *)
+
+and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
+  let t1_ty, t1_op, t1_strm = a in
+  begin match t1_ty with
+  | Ptr p -> 
+    let loaded_t1 = gensym "l" in
+    (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
+  | _ -> Printf.printf "the regular thing\n\n\n\n"; a
+  end
 
 and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : Ctxt.t * arg_list * stream =
   let ctxt, args, str = c in
