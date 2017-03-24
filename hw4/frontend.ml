@@ -312,7 +312,6 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       else failwith "Expected a void return type"
     end
   | Decl vd ->
-    (* Printf.printf "Decl vd";   *)
     let id, expr = vd in 
     let typ, opr, strm = cmp_exp c expr in
     let new_c = Ctxt.add c id (typ, opr) in
@@ -322,7 +321,14 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
   | If (exp_node1, block1, block2) -> failwith "If"
   | For (vd_list, exp_node_option,
            stmt_node_option, block1) -> failwith "For"
-  | While (exp_node, block1) -> failwith "While"
+  | While (exp_node, block1) -> 
+    let typ, opr, strm = cmp_exp c exp_node in
+    begin match typ with
+    | Ll.I1 -> 
+      cmp_stmt c typ (Ast.no_loc (Ast.If (exp_node, block1, [])))
+    | _ -> failwith "operand not a boolean"
+    end
+
   end
   
 
