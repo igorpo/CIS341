@@ -328,7 +328,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     let l2 = gensym "else" in 
     let l3 = gensym "end_if" in 
     let strm = c_strm 
-      >@ [T (Ll.Cbr (Ll.Id l0, l1, l2))] 
+      >@ [T (Ll.Cbr (op, l1, l2))] 
       >@ [L (l1)]
       >@ cmp_b1
       >@ [T (Br (l3))]
