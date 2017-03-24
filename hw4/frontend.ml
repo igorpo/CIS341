@@ -271,7 +271,7 @@ and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
   | Ptr p -> 
     let loaded_t1 = gensym "l" in
     (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
-  | _ -> Printf.printf "the regular thing\n\n\n\n"; a
+  | _ -> a
   end
 
 and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : Ctxt.t * arg_list * stream =
@@ -384,9 +384,9 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       let l0 = gensym "begin_while" in 
       let l1 = gensym "while_block" in 
       let l2 = gensym "end_while" in 
-      let strm = while_strm 
-        >@ [T (Br (l0))]
+      let strm = [T (Br (l0))]
         >@ [L (l0)]
+        >@ while_strm 
         >@ [T (Ll.Cbr (while_opr, l1, l2))] 
         >@ [L (l1)]
         >@ cmp_while_block
