@@ -254,7 +254,9 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CStr s -> failwith "CStr"
   | CArr (typ, exp_node_list) -> failwith "CArr"
   | NewArr (typ, exp_node) -> failwith "NewArr"
-  | Id i -> failwith "Id"
+  (* let lookup (id:Ast.id) (c:t) : Ll.ty * Ll.operand = *)
+  | Id i -> let typ, opr = Ctxt.lookup i c in
+    (typ, opr, [])
   | Index (exp_node1, exp_node2) -> failwith "Index" 
   (* let lookup_function (id:Ast.id) (c:t) : Ll.fty * Ll.operand = *)
   | Call (i, exp_node_list) -> 
