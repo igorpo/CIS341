@@ -318,7 +318,25 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     (new_c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))] >@ [I (id, Ll.Alloca typ)])
   | Assn (exp_node1, exp_node2) -> failwith "Assn"
   | SCall (i, exp_node_list) -> failwith "SCall"
-  | If (exp_node1, block1, block2) -> failwith "If"
+  | If (e, b1, b2) -> 
+    let t, op, c_strm = cmp_exp c e in
+    let cmp_b1 = cmp_block c rt b1 in
+    let cmp_b2 = cmp_block c rt b2 in 
+    let l0 = gensym "begin_if" in 
+    let l1 = gensym "then" in
+    let l2 = gensym "else" in 
+    let l3 = gensym "end_if" in 
+    let strm = c_strm 
+      >@ [T (Ll.Cbr (op, l1, l2))] 
+      >@ [L (l1)]
+      >@ cmp_b1
+      >@ [T (Br (l3))]
+      >@ [L (l2)]
+      >@ [T (Br (l3))]
+      >@ cmp_b2
+      >@ [L (l3)]
+    in 
+    (c, strm)
   | For (vd_list, exp_node_option,
            stmt_node_option, block1) -> failwith "For"
   | While (exp_node, block1) -> 
