@@ -201,6 +201,13 @@ let cmp_bop (b: Ast.binop) (op1: Ll.operand) (op2: Ll.operand) (t: Ll.ty) : Ll.i
   | Sar -> Ll.Binop (Ll.Ashr, t, op1, op2)
   end
 
+let cmp_uop (b: Ast.unop) (op: Ll.operand) (t: Ll.ty) : Ll.insn =
+  begin match b with 
+  | Neg -> Ll.Binop (Ll.Mul, t, op, Ll.Const (-1L))
+  | Lognot -> Ll.Binop (Ll.Xor, t, op, Ll.Const (1L))
+  | Bitnot -> Ll.Binop (Ll.Xor, t, op, Ll.Const (-1L))
+  end
+
 (* Compile an expression exp in context c, outputting the Ll operand that will
    recieve the value of the expression, and the stream of instructions
    implementing the expression. 
@@ -259,7 +266,11 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
     let lbl = gensym i in
     (typ, ll_op, streams >@ [I (lbl, Ll.Call (typ, ll_op, ty_op_list))])
-  | Uop (unop1, exp_node) -> failwith "Uop"
+  | Uop (uop1, e1) -> 
+    let t = expr_type (Uop (uop1, e1)) in 
+    let id = gensym "uop" in
+    let typ, op, strm = load_helper @@ cmp_exp c e1 in
+    (cmp_ty t, Ll.Id id, strm >@ [I (id, cmp_uop uop1 op typ)])
   end   
 
 (* and cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream =
@@ -323,7 +334,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
           if typ = Ll.Ptr rt then
 
             let loaded_val = gensym "" in
-            Printf.printf "THIS IS WHERE WE ARE\n\n\n\n";
+            (* Printf.printf "THIS IS WHERE WE ARE\n\n\n\n"; *)
             (c, strm
 (*               >@ [T (Br ("end"))]
               >@ [L ("end")]  *)
@@ -333,7 +344,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
         else
           failwith "Incompatible return types")
     | None -> 
-      Printf.printf "None case";
+      (* Printf.printf "None case"; *)
       if rt = Void then (c, [T (Ll.Ret (Void, None))])
       else failwith "Expected a void return type"
     end
@@ -367,8 +378,8 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       >@ cmp_b1
       >@ [T (Br (l3))]
       >@ [L (l2)]
-      >@ [T (Br (l3))]
       >@ cmp_b2
+      >@ [T (Br (l3))]
       >@ [L (l3)]
       (* >@ [T (Br ("end"))] *)
     in 
