@@ -318,7 +318,12 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     let typ, opr, strm = cmp_exp c expr in
     let new_c = Ctxt.add c id (typ, opr) in
     (new_c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))] >@ [I (id, Ll.Alloca typ)])
-  | Assn (exp_node1, exp_node2) -> failwith "Assn"
+  | Assn (exp_node1, exp_node2) -> 
+    begin match exp_node1.elt with
+    | Id id -> 
+    | Index (e_n1, e_n2) ->
+    | _ -> failwith "program is not well-formed"
+    end
   | SCall (i, exp_node_list) -> failwith "SCall"
   | If (e, b1, b2) -> 
     let t, op, c_strm = cmp_exp c e in
