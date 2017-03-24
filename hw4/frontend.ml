@@ -236,17 +236,14 @@ let cmp_bop (b: Ast.binop) (op1: Ll.operand) (op2: Ll.operand) (t: Ll.ty) : Ll.i
 
 type arg_list = (Ll.ty * Ll.operand) list
 
-  
-(* let cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream =
-  failwith "" *)
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   begin match exp.elt with 
   | Bop (b, e1, e2) -> 
     let t = expr_type (Bop (b, e1, e2)) in 
-    let id = gensym "" in
-    let t1, op1, strm1 = cmp_exp c e1 in 
-    let t2, op2, strm2 = cmp_exp c e2 in  
+    let id = gensym "bop" in
+    let t1, op1, strm1 = load_helper @@ cmp_exp c e1 in
+    let _, op2, strm2 = load_helper @@ cmp_exp c e2 in
     (cmp_ty t, Ll.Id id, strm2 >@ strm1 >@ [I (id, cmp_bop b op1 op2 t1)])
   | CNull t -> (cmp_ty t, Ll.Null,[])
   | CBool b -> (Ll.I1, Ll.Const (bool_to_int64 b),[])
@@ -254,11 +251,9 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CStr s -> failwith "CStr"
   | CArr (typ, exp_node_list) -> failwith "CArr"
   | NewArr (typ, exp_node) -> failwith "NewArr"
-  (* let lookup (id:Ast.id) (c:t) : Ll.ty * Ll.operand = *)
   | Id i -> let typ, opr = Ctxt.lookup i c in
-    (typ, opr, [])
+    (Ll.Ptr typ, Ll.Id i, [])
   | Index (exp_node1, exp_node2) -> failwith "Index" 
-  (* let lookup_function (id:Ast.id) (c:t) : Ll.fty * Ll.operand = *)
   | Call (i, exp_node_list) -> 
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
     let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
@@ -266,6 +261,18 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (typ, ll_op, streams >@ [I (lbl, Ll.Call (typ, ll_op, ty_op_list))])
   | Uop (unop1, exp_node) -> failwith "Uop"
   end   
+
+(* and cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream =
+  failwith "" *)
+
+and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
+  let t1_ty, t1_op, t1_strm = a in
+  begin match t1_ty with
+  | Ptr p -> 
+    let loaded_t1 = gensym "l" in
+    (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
+  | _ -> a
+  end
 
 and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : Ctxt.t * arg_list * stream =
   let ctxt, args, str = c in
@@ -305,11 +312,28 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     begin match e_opt with
     | Some s -> 
       let typ, opr, strm = cmp_exp c s in 
-      if rt = typ then
-        (c, strm >@ [T (Ll.Ret (typ, Some opr))])
+      if typ = rt then
+        (c, strm 
+(*           >@ [T (Br ("end"))]
+          >@ [L ("end")] *)
+          >@ [T (Ll.Ret (typ, Some opr))])
       else 
-        failwith "Incompatible return types"
+        (
+          (* Printf.printf "THIS IS WHERE WE ARE\n\n\n\n"; *)
+          if typ = Ll.Ptr rt then
+
+            let loaded_val = gensym "" in
+            Printf.printf "THIS IS WHERE WE ARE\n\n\n\n";
+            (c, strm
+(*               >@ [T (Br ("end"))]
+              >@ [L ("end")]  *)
+              >@ [I (loaded_val, Ll.Load (typ, opr))]
+              >@ [T (Ll.Ret (rt, Some (Ll.Id loaded_val)))]
+              )
+        else
+          failwith "Incompatible return types")
     | None -> 
+      Printf.printf "None case";
       if rt = Void then (c, [T (Ll.Ret (Void, None))])
       else failwith "Expected a void return type"
     end
@@ -317,11 +341,13 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     let id, expr = vd in 
     let typ, opr, strm = cmp_exp c expr in
     let new_c = Ctxt.add c id (typ, opr) in
-    (new_c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))] >@ [I (id, Ll.Alloca typ)])
+    (new_c, strm >@ [E (id, Ll.Alloca typ)] >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
   | Assn (exp_node1, exp_node2) -> 
     begin match exp_node1.elt with
     | Id id -> 
-    | Index (e_n1, e_n2) ->
+      let typ, opr, strm = cmp_exp c exp_node2 in
+      (c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
+    | Index (e_n1, e_n2) -> failwith "Index (e_n1, e_n2)"
     | _ -> failwith "program is not well-formed"
     end
   | SCall (i, exp_node_list) -> failwith "SCall"
@@ -334,6 +360,8 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     let l2 = gensym "else" in 
     let l3 = gensym "end_if" in 
     let strm = c_strm 
+      >@ [T (Br (l0))]
+      >@ [L (l0)]
       >@ [T (Ll.Cbr (op, l1, l2))] 
       >@ [L (l1)]
       >@ cmp_b1
@@ -342,15 +370,31 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       >@ [T (Br (l3))]
       >@ cmp_b2
       >@ [L (l3)]
+      (* >@ [T (Br ("end"))] *)
     in 
     (c, strm)
   | For (vd_list, exp_node_option,
            stmt_node_option, block1) -> failwith "For"
-  | While (exp_node, block1) -> 
-    let typ, opr, strm = cmp_exp c exp_node in
+  | While (while_cond_exp, while_block) -> 
+    let typ, while_opr, while_strm = cmp_exp c while_cond_exp in
     begin match typ with
     | Ll.I1 -> 
-      cmp_stmt c typ (Ast.no_loc (Ast.If (exp_node, block1, [])))
+      (* cmp_stmt c typ (Ast.no_loc (Ast.If (exp_node, block1, []))) *)
+      let cmp_while_block = cmp_block c typ while_block in 
+      let l0 = gensym "begin_while" in 
+      let l1 = gensym "while_block" in 
+      let l2 = gensym "end_while" in 
+      let strm = [T (Br (l0))]
+        >@ [L (l0)]
+        >@ while_strm 
+        >@ [T (Ll.Cbr (while_opr, l1, l2))] 
+        >@ [L (l1)]
+        >@ cmp_while_block
+        >@ [T (Br (l0))]
+        >@ [L (l2)]
+        (* >@ [T (Br ("end"))] *)
+      in 
+      (c, strm)
     | _ -> failwith "operand not a boolean"
     end
 

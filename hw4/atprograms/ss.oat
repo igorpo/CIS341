@@ -1,0 +1,10 @@
+int program (int argc, string[] argv) {
+  var x = 17;
+  var y = 17;
+  
+  if (x == 17) {
+  	return 17;
+  }
+
+  return x;
+}
