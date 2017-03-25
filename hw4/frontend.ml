@@ -281,7 +281,6 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     
   | Index (exp_node1, exp_node2) -> failwith "Index" 
   | Call (i, exp_node_list) ->
-    
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
     let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
     let lbl = gensym i in
@@ -311,7 +310,7 @@ and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
 
 and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : Ctxt.t * arg_list * stream =
   let ctxt, args, str = c in
-  let arg_t, arg_o, arg_s = cmp_exp ctxt a in
+  let arg_t, arg_o, arg_s = load_helper @@ cmp_exp ctxt a in
   (ctxt, args @ [(arg_t, arg_o)], str >@ arg_s)
 
 (* Compile a statement in context c with return typ rt. Return a new context,
@@ -353,7 +352,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     (* Printf.printf "Ret e_opt";   *)
     begin match e_opt with
     | Some s -> 
-      let typ, opr, strm = cmp_exp c s in 
+      let typ, opr, strm = load_helper @@ cmp_exp c s in 
       if typ = rt then
         (c, strm 
 (*           >@ [T (Br ("end"))]
@@ -370,8 +369,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
 (*               >@ [T (Br ("end"))]
               >@ [L ("end")]  *)
               >@ [I (loaded_val, Ll.Load (typ, opr))]
-              >@ [T (Ll.Ret (rt, Some (Ll.Id loaded_val)))]
-              )
+              >@ [T (Ll.Ret (rt, Some (Ll.Id loaded_val)))])
         else
           failwith "Incompatible return types")
     | None -> 
@@ -387,11 +385,17 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
   | Assn (exp_node1, exp_node2) -> 
     begin match exp_node1.elt with
     | Id id -> 
+      (* TODO: *)
       let typ, opr, strm = cmp_exp c exp_node2 in
       let typ2, opr2, strm2 = cmp_exp c exp_node1 in
       begin match opr2 with
       | Ll.Gid g -> (c, strm >@ [I (g, Ll.Store (typ, opr, Ll.Gid g))])
-      | _ -> (c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
+      | _ -> 
+        (* TODO: verify that typ on (t,o) case is right *)
+        begin match Ctxt.lookup id c with
+        | (t, o) -> (c, strm >@ [I (id, Ll.Store (t, opr, o))])
+        | _ -> (c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
+        end
       end
         
     | Index (e_n1, e_n2) -> failwith "Index (e_n1, e_n2)"
@@ -557,8 +561,18 @@ let cmp_fdecl_helper (a:Ctxt.t * uid_l * ty_l * stream) (d:ty * id) : Ctxt.t * u
   let ast_ty, new_id = d in
   (* Printf.printf "Saving %s to context\n\n\n" new_id; *)
   let new_ty = cmp_ty ast_ty in
-  let new_c = Ctxt.add c new_id (new_ty, Ll.Id new_id) in
-  (new_c, u_l @ [new_id], t_l @ [new_ty], strm)
+  begin match new_ty with
+  | I1 | I8 | I64 -> 
+    let lcl = gensym "lcl" in
+    let new_strm = strm >@ [I (lcl, Ll.Alloca new_ty)] >@ [I (lcl, Ll.Store (new_ty, Ll.Id new_id, Ll.Id lcl))] in
+    Printf.printf "New id == %s\n\n\n\n" new_id;
+    let new_c = Ctxt.add c new_id (Ll.Ptr new_ty, Ll.Id lcl) in
+    (new_c, u_l @ [new_id], t_l @ [new_ty], new_strm)
+  | _ -> 
+    let new_c = Ctxt.add c new_id (new_ty, Ll.Id new_id) in
+    (new_c, u_l @ [new_id], t_l @ [new_ty], strm)
+  end
+  
   
 
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
