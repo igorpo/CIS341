@@ -255,11 +255,21 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CNull t -> (cmp_ty t, Ll.Null,[])
   | CBool b -> (Ll.I1, Ll.Const (bool_to_int64 b),[])
   | CInt i -> (Ll.I64, Ll.Const i,[])
-  | CStr s -> failwith "CStr"
+  | CStr s -> 
+     let str_gid = gensym "string" in
+     let typ = Ll.Ptr Ll.I8 in
+     let str_ginit = Ll.GString str_gid in
+     let str_gdecl = (typ, str_ginit) in
+     (typ, Ll.Gid str_gid, [G (str_gid, str_gdecl)])
   | CArr (typ, exp_node_list) -> failwith "CArr"
   | NewArr (typ, exp_node) -> failwith "NewArr"
-  | Id i -> let typ, opr = Ctxt.lookup i c in
-    (Ll.Ptr typ, Ll.Id i, [])
+  | Id i -> 
+    let typ, opr = Ctxt.lookup i c in
+    begin match opr with
+    | Gid g -> (Ll.Ptr typ, Ll.Gid g, [])
+    | _ -> (Ll.Ptr typ, Ll.Id i, [])
+    end
+    
   | Index (exp_node1, exp_node2) -> failwith "Index" 
   | Call (i, exp_node_list) -> 
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
@@ -333,7 +343,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
           (* Printf.printf "THIS IS WHERE WE ARE\n\n\n\n"; *)
           if typ = Ll.Ptr rt then
 
-            let loaded_val = gensym "" in
+            let loaded_val = gensym "loaded" in
             (* Printf.printf "THIS IS WHERE WE ARE\n\n\n\n"; *)
             (c, strm
 (*               >@ [T (Br ("end"))]
@@ -420,8 +430,36 @@ and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : stream =
     ) (c,[]) stmts
 
 
+(* 
+type gdecl =
+  { name : id
+  ; init : exp node
+  } 
+
+  type fdecl =
+  { rtyp : ty
+  ; name : id
+  ; args : (ty * id) list
+  ; body : block        
+  }
+
+
+let add (c:t) (id:id) (bnd:Ll.ty * Ll.operand) : t = (id,bnd)::c
+
+let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
+ *)
+
 let cmp_global_ctxt_hlpr (c:Ctxt.t) (p:Ast.decl) : Ctxt.t =
-  c
+  begin match p with
+  | Gvdecl g ->
+    let id = g.elt.name in
+    let typ, opr, _ = cmp_exp c g.elt.init in
+    (* Printf.printf "Coming from here %s\n" id; *)
+    Ctxt.add c g.elt.name (typ, Ll.Gid id)
+  | Gfdecl f -> 
+    let fn = f.elt.name in
+    Ctxt.add c fn (cmp_ty f.elt.rtyp, Ll.Gid fn)
+  end
 
 (* Populate a context with bindings for global variables and functions,
    mapping OAT identifiers to LLVMlite gids and their types.
