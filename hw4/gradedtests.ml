@@ -240,7 +240,8 @@ let old_student_tests = [
 ]
 
 let tests : suite =
-  [ GradedTest("parse tests", 15, parse_tests);
+  [ 
+    GradedTest("parse tests", 15, parse_tests);
     GradedTest("easiest tests", 15, executed_oat_file easiest_tests);
     GradedTest("globals tests", 15, executed_oat_file globals_tests);
     GradedTest("path tests", 10, executed_oat_file path_tests);
