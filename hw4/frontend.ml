@@ -255,7 +255,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let id = gensym "bop" in
     let t1, op1, strm1 = load_helper @@ cmp_exp c e1 in
     let _, op2, strm2 = load_helper @@ cmp_exp c e2 in
-    (cmp_ty t, Ll.Id id, strm2 >@ strm1 >@ [I (id, cmp_bop b op1 op2 t1)])
+    (cmp_ty t, Ll.Id id, strm1 >@ strm2 >@ [I (id, cmp_bop b op1 op2 t1)])
   | CNull t -> (cmp_ty t, Ll.Null,[])
   | CBool b -> (Ll.I1, Ll.Const (bool_to_int64 b),[])
   | CInt i -> (Ll.I64, Ll.Const i,[])
@@ -268,13 +268,15 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CArr (typ, exp_node_list) -> failwith "CArr"
   | NewArr (typ, exp_node) -> failwith "NewArr"
   | Id i -> 
+    (* Printf.printf "Id %s \n\n\n" i; *)
     let typ, opr = Ctxt.lookup i c in
+    (* (typ, opr, []) *)
     (* Printf.printf "Id %s \n\n\n" i; *)
     begin match opr with
-    | Gid g -> (Ll.Ptr typ, Ll.Gid g, [])
+    | Gid g -> (typ, Ll.Gid g, [])
     | Id id -> (typ, Ll.Id id, [])
-    | Const c -> (typ, Ll.Id i, [])
-    | _ -> (Ll.Ptr typ, Ll.Id i, [])
+    | Const c -> (typ, opr, [])
+    | Null -> (typ, Ll.Id i, [])
     end
     
   | Index (exp_node1, exp_node2) -> failwith "Index" 
@@ -297,10 +299,13 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
 
 and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
   let t1_ty, t1_op, t1_strm = a in
-  begin match t1_ty with
-  | Ptr p -> 
+  begin match t1_ty, t1_op with
+  | (Ptr p, _) ->
     let loaded_t1 = gensym "l" in
     (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
+  | (_, Gid g) -> 
+    let loaded_t1 = gensym "gl" in
+    (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
   | _ -> a
   end
 
