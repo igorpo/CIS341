@@ -326,6 +326,13 @@ and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : 
      pointer, you just need to store to it!
 
  *)
+
+let safe_ptr_usage (t:Ll.ty) (op:Ll.operand) : Ll.operand * stream =
+  begin match op with
+    | Gid g -> let _, o, str = load_helper (t,op,[]) in (o, str)
+    | _ -> (op, [])
+  end
+
 let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
   begin match stmt.elt with
   | Ret e_opt -> 
@@ -367,7 +374,12 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     begin match exp_node1.elt with
     | Id id -> 
       let typ, opr, strm = cmp_exp c exp_node2 in
-      (c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
+      let typ2, opr2, strm2 = cmp_exp c exp_node1 in
+      begin match opr2 with
+      | Ll.Gid g -> (c, strm >@ [I (g, Ll.Store (typ, opr, Ll.Gid g))])
+      | _ -> (c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
+      end
+        
     | Index (e_n1, e_n2) -> failwith "Index (e_n1, e_n2)"
     | _ -> failwith "program is not well-formed"
     end
@@ -380,10 +392,13 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     let l1 = gensym "then" in
     let l2 = gensym "else" in 
     let l3 = gensym "end_if" in 
+    (* and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream = *)
+    let new_op, load_strm = safe_ptr_usage t op in
     let strm = c_strm 
       >@ [T (Br (l0))]
       >@ [L (l0)]
-      >@ [T (Ll.Cbr (op, l1, l2))] 
+      >@ load_strm
+      >@ [T (Ll.Cbr (new_op, l1, l2))] 
       >@ [L (l1)]
       >@ cmp_b1
       >@ [T (Br (l3))]
@@ -405,10 +420,12 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       let l0 = gensym "begin_while" in 
       let l1 = gensym "while_block" in 
       let l2 = gensym "end_while" in 
+      let new_op, load_strm = safe_ptr_usage typ while_opr in
       let strm = [T (Br (l0))]
         >@ [L (l0)]
-        >@ while_strm 
-        >@ [T (Ll.Cbr (while_opr, l1, l2))] 
+        >@ while_strm
+        >@ load_strm 
+        >@ [T (Ll.Cbr (new_op, l1, l2))] 
         >@ [L (l1)]
         >@ cmp_while_block
         >@ [T (Br (l0))]
