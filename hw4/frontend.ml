@@ -565,7 +565,7 @@ let cmp_fdecl_helper (a:Ctxt.t * uid_l * ty_l * stream) (d:ty * id) : Ctxt.t * u
   | I1 | I8 | I64 -> 
     let lcl = gensym "lcl" in
     let new_strm = strm >@ [I (lcl, Ll.Alloca new_ty)] >@ [I (lcl, Ll.Store (new_ty, Ll.Id new_id, Ll.Id lcl))] in
-    Printf.printf "New id == %s\n\n\n\n" new_id;
+    (* Printf.printf "New id == %s\n\n\n\n" new_id; *)
     let new_c = Ctxt.add c new_id (Ll.Ptr new_ty, Ll.Id lcl) in
     (new_c, u_l @ [new_id], t_l @ [new_ty], new_strm)
   | _ -> 
