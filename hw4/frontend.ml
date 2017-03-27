@@ -251,6 +251,7 @@ type arg_list = (Ll.ty * Ll.operand) list
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   begin match exp.elt with 
   | Bop (b, e1, e2) -> 
+    (* Printf.printf "Bop"; *)
     let t = expr_type (Bop (b, e1, e2)) in 
     let id = gensym "bop" in
     let t1, op1, strm1 = load_helper @@ cmp_exp c e1 in
@@ -271,12 +272,13 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     (* Printf.printf "Id %s \n\n\n" i; *)
     let typ, opr = Ctxt.lookup i c in
     (* (typ, opr, []) *)
-    (* Printf.printf "Id %s \n\n\n" i; *)
+    (* Printf.printf "Id %s's type is " i; *)
+
     begin match opr with
-    | Gid g -> (typ, Ll.Gid g, [])
-    | Id id -> (typ, Ll.Id id, [])
-    | Const c -> (typ, opr, [])
-    | Null -> (typ, Ll.Id i, [])
+    | Gid g -> (* Printf.printf "Global\n"; *) (typ, Ll.Gid g, [])
+    | Id id -> (* Printf.printf "Local\n";  *)(typ, Ll.Id id, [])
+    | Const c -> (* Printf.printf "Const\n"; *) (typ, Ll.Id i, [])
+    | Null -> (* Printf.printf "Null\n"; *) (typ, Ll.Id i, [])
     end
     
   | Index (exp_node1, exp_node2) -> failwith "Index" 
@@ -297,6 +299,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   failwith "" *)
 
 and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
+  (* Printf.printf "load_helper"; *)
   let t1_ty, t1_op, t1_strm = a in
   begin match t1_ty, t1_op with
   | (Ptr p, _) ->
@@ -380,23 +383,28 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
   | Decl vd ->
     let id, expr = vd in 
     let typ, opr, strm = cmp_exp c expr in
-    let new_c = Ctxt.add c id (typ, opr) in
+    let new_c = Ctxt.add c id (Ll.Ptr typ, Ll.Id id) in
     (new_c, strm >@ [E (id, Ll.Alloca typ)] >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
-  | Assn (exp_node1, exp_node2) -> 
-    begin match exp_node1.elt with
+  | Assn (lhs_exp, rhs_exp) -> 
+    begin match lhs_exp.elt with
     | Id id -> 
       (* TODO: *)
-      let typ, opr, strm = cmp_exp c exp_node2 in
-      let typ2, opr2, strm2 = cmp_exp c exp_node1 in
-      begin match opr2 with
-      | Ll.Gid g -> (c, strm >@ [I (g, Ll.Store (typ, opr, Ll.Gid g))])
-      | _ -> 
+      let rhs_typ, rhs_opr, rhs_strm = cmp_exp c rhs_exp in
+      let lhs_typ, lhs_opr, lhs_strm = cmp_exp c lhs_exp in
+       
+      (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (rhs_typ, rhs_opr, lhs_opr))])
+      (* begin match rhs_opr with
+      | Ll.Gid g -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, Ll.Gid g, lhs_opr))])
+      | Ll.Const con -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, Ll.Const con, lhs_opr))])
+      | Ll.Id id2 -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, opr, lhs_opr))])
+      | Ll.Null -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, opr, lhs_opr))])
         (* TODO: verify that typ on (t,o) case is right *)
-        begin match Ctxt.lookup id c with
-        | (t, o) -> (c, strm >@ [I (id, Ll.Store (t, opr, o))])
+        
+        (* begin match Ctxt.lookup id c with
+        | (t, o) -> (c, strm >@ [I (id, Ll.Store (t, opr, Ll.Id id))])
         | _ -> (c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
-        end
-      end
+        end *)
+      end *)
         
     | Index (e_n1, e_n2) -> failwith "Index (e_n1, e_n2)"
     | _ -> failwith "program is not well-formed"
