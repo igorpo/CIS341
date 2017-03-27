@@ -302,12 +302,16 @@ and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
   (* Printf.printf "load_helper"; *)
   let t1_ty, t1_op, t1_strm = a in
   begin match t1_ty, t1_op with
-  | (Ptr p, _) ->
-    let loaded_t1 = gensym "l" in
-    (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
-  | (_, Gid g) -> 
+  | (Ptr p, Gid g) -> (* Printf.printf "Hitting case 1\n"; *)
     let loaded_t1 = gensym "gl" in
     (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
+  | (_, Gid g) -> (* Printf.printf "Hitting case 2\n"; *)
+    let loaded_t1 = gensym "gl" in
+    (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
+  | (Ptr p, _) ->
+    (* Printf.printf "Hitting case 3\n"; *)
+    let loaded_t1 = gensym "l" in
+    (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
   | _ -> a
   end
 
@@ -382,16 +386,17 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     end
   | Decl vd ->
     let id, expr = vd in 
-    let typ, opr, strm = cmp_exp c expr in
+    (* Printf.printf "Declaring %s\n" id; *)
+    let typ, opr, strm = load_helper @@ cmp_exp c expr in
     let new_c = Ctxt.add c id (Ll.Ptr typ, Ll.Id id) in
     (new_c, strm >@ [E (id, Ll.Alloca typ)] >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
   | Assn (lhs_exp, rhs_exp) -> 
     begin match lhs_exp.elt with
     | Id id -> 
+      (* Printf.printf "Assigning %s\n" id; *)
       (* TODO: *)
-      let rhs_typ, rhs_opr, rhs_strm = cmp_exp c rhs_exp in
-      let lhs_typ, lhs_opr, lhs_strm = cmp_exp c lhs_exp in
-       
+      let rhs_typ, rhs_opr, rhs_strm = load_helper @@ cmp_exp c rhs_exp in
+      let lhs_typ, lhs_opr, lhs_strm = load_helper @@ cmp_exp c lhs_exp in
       (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (rhs_typ, rhs_opr, lhs_opr))])
       (* begin match rhs_opr with
       | Ll.Gid g -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, Ll.Gid g, lhs_opr))])
