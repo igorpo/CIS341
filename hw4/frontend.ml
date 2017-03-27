@@ -396,7 +396,7 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       (* Printf.printf "Assigning %s\n" id; *)
       (* TODO: *)
       let rhs_typ, rhs_opr, rhs_strm = load_helper @@ cmp_exp c rhs_exp in
-      let lhs_typ, lhs_opr, lhs_strm = load_helper @@ cmp_exp c lhs_exp in
+      let lhs_typ, lhs_opr, lhs_strm = cmp_exp c lhs_exp in
       (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (rhs_typ, rhs_opr, lhs_opr))])
       (* begin match rhs_opr with
       | Ll.Gid g -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, Ll.Gid g, lhs_opr))])
