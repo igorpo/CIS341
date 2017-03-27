@@ -120,7 +120,7 @@ let executed_oat_file tests =
     tests
 
 let easiest_tests = [
-  ("atprograms/ss.oat", "", "17");
+  (* ("atprograms/ss.oat", "", "17"); *)
   ("atprograms/easyrun2.oat", "", "35");
   ("atprograms/easyrun1.oat", "", "17");
   ("atprograms/easyrun3.oat", "", "73");
@@ -152,13 +152,13 @@ let path_tests = [
 ]
 
 let easy_tests = [
-  (* ("atprograms/run26.oat", "", "0");
+    ("atprograms/run26.oat", "", "0");
     ("atprograms/run27.oat", "", "99");
     ("atprograms/run28.oat", "", "18");
     ("atprograms/run29.oat", "", "1");
-    ("atprograms/run30.oat", "", "9"); *)
+    ("atprograms/run30.oat", "", "9");
     ("atprograms/run31.oat", "", "9");
-    (* ("atprograms/run13.oat", "", "1");
+    ("atprograms/run13.oat", "", "1");
     ("atprograms/run32.oat", "", "33");
     ("atprograms/run21.oat", "", "99");
     ("atprograms/run33.oat", "", "1");
@@ -172,7 +172,7 @@ let easy_tests = [
     ("atprograms/run49.oat", "", "abc0");
     ("atprograms/run50.oat", "", "abcde0");
     ("atprograms/run60.oat", "", "85");
-    ("atprograms/run61.oat", "", "3410"); *)
+    ("atprograms/run61.oat", "", "3410");
 ]
 
 let medium_tests = [
