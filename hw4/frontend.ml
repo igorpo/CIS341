@@ -269,16 +269,12 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CArr (typ, exp_node_list) -> failwith "CArr"
   | NewArr (typ, exp_node) -> failwith "NewArr"
   | Id i -> 
-    (* Printf.printf "Id %s \n\n\n" i; *)
     let typ, opr = Ctxt.lookup i c in
-    (* (typ, opr, []) *)
-    (* Printf.printf "Id %s's type is " i; *)
-
     begin match opr with
-    | Gid g -> (* Printf.printf "Global\n"; *) (typ, Ll.Gid g, [])
-    | Id id -> (* Printf.printf "Local\n";  *)(typ, Ll.Id id, [])
-    | Const c -> (* Printf.printf "Const\n"; *) (typ, Ll.Id i, [])
-    | Null -> (* Printf.printf "Null\n"; *) (typ, Ll.Id i, [])
+    | Gid g -> (typ, Ll.Gid g, [])
+    | Id id -> (typ, Ll.Id id, [])
+    | Const c -> (typ, Ll.Id i, [])
+    | Null -> (typ, Ll.Id i, [])
     end
     
   | Index (exp_node1, exp_node2) -> failwith "Index" 
@@ -286,7 +282,6 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
     let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
     let lbl = gensym i in
-    (* Printf.printf "Trying to compile Call %s and lbl=%s\n" i lbl;  *)
     (typ, Ll.Id lbl, streams >@ [I (lbl, Ll.Call (typ, ll_op, ty_op_list))])
   | Uop (uop1, e1) -> 
     let t = expr_type (Uop (uop1, e1)) in 
@@ -294,9 +289,6 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let typ, op, strm = load_helper @@ cmp_exp c e1 in
     (cmp_ty t, Ll.Id id, strm >@ [I (id, cmp_uop uop1 op typ)])
   end   
-
-(* and cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream =
-  failwith "" *)
 
 and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
   (* Printf.printf "load_helper"; *)
@@ -352,6 +344,16 @@ let safe_ptr_usage (t:Ll.ty) (op:Ll.operand) : Ll.operand * stream =
     | Gid g -> let _, o, str = load_helper (t,op,[]) in (o, str)
     | _ -> (op, [])
   end
+
+(* let rec for_decl_helper (c: Ctxt.t) (vd_l: vdecl list) : stream =
+  begin match vd_l with 
+  | (h_id, h_expr_n)::tl -> 
+    let _, _, strm = cmp_exp c h_expr_n in
+    strm >@ (for_decl_helper c tl)
+  | [] -> []
+  end
+ *)
+
 
 let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
   begin match stmt.elt with
@@ -414,8 +416,42 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       >@ [L (l3)]
     in 
     (c, strm)
-  | For (vd_list, exp_node_option,
-           stmt_node_option, block1) -> failwith "For"
+
+  | For (vd_list, cnd_option, incr_option, body) -> 
+    let new_c, vd_strm = List.fold_left for_decl_helper (c,[]) vd_list in
+    
+    (* conditional section *) 
+    let cnd_ty, cnd_opr, cnd_strm = 
+    begin match cnd_option with 
+      | Some s -> cmp_exp new_c s 
+      | None -> cmp_exp new_c (Ast.no_loc (Ast.CBool true))
+    end in 
+
+    (* incrementer section *)
+    let _, incr_strm =
+    begin match incr_option with 
+    | Some s -> cmp_stmt new_c Ll.Void s 
+    | None -> new_c, []
+    end in 
+
+    let loop_body = cmp_block new_c cnd_ty body in 
+    let l0 = gensym "begin_for" in 
+    let l1 = gensym "for_block" in 
+    let l2 = gensym "end_for" in 
+    let new_cnd_op, load_strm = safe_ptr_usage cnd_ty cnd_opr in 
+    let strm = vd_strm 
+      >@ [T (Br (l0))]
+      >@ [L (l0)]
+      >@ cnd_strm
+      >@ load_strm
+      >@ [T (Cbr (new_cnd_op, l1, l2))]
+      >@ [L (l1)]
+      >@ loop_body 
+      >@ incr_strm
+      >@ [T (Br (l0))]
+      >@ [L (l2)]
+    in  
+    (c, strm)
   | While (while_cond_exp, while_block) -> 
     let typ, while_opr, while_strm = cmp_exp c while_cond_exp in
     begin match typ with
@@ -438,9 +474,11 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       (c, strm)
     | _ -> failwith "operand not a boolean"
     end
-
   end
   
+and for_decl_helper (a: Ctxt.t * stream) (vd: vdecl) : Ctxt.t * stream =
+  let c, str = a in
+  cmp_stmt c Ll.Void (no_loc (Ast.Decl (vd)))
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : stream =
@@ -448,26 +486,6 @@ and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : stream =
       let c, stmt_code = cmp_stmt c rt s in
       c, code >@ stmt_code
     ) (c,[]) stmts
-
-
-(* 
-type gdecl =
-  { name : id
-  ; init : exp node
-  } 
-
-  type fdecl =
-  { rtyp : ty
-  ; name : id
-  ; args : (ty * id) list
-  ; body : block        
-  }
-
-
-let add (c:t) (id:id) (bnd:Ll.ty * Ll.operand) : t = (id,bnd)::c
-
-let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
- *)
 
 
 let rec ty_cmp_helper (l: (Ast.ty * id) list) : Ll.ty list = 
@@ -510,32 +528,6 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
    3. Extend the context with bindings for function variables
    3. Compile the body of the function using cmp_block
    4. Use cfg_of_stream to produce a LLVMlite cfg from 
-
-
-OAT:
-   type fdecl =
-  { rtyp : ty
-  ; name : id
-  ; args : (ty * id) list
-  ; body : block        
-  }
-
-LLVM:
-  fdecl = { fty: fty; param: uid list; cfg: cfg }
-  
-  fty = ty list * ty 
-
-cfg_of_stream(elt list) -> Ll.cfg * (Ll.gid * Ll.gdecl) list
-LLVM_CODE = []
-fty = ([args[0], ... , ...],  rtyp) 
-uid_list = [args[1], ... , ...]
-cfg, rest = cfg_of_stream (lift LLVM_CODE)
-return {fty, uid_list, cfg} * rest
-
-
-
-
-let add (c:t) (id:id) (bnd:Ll.ty * Ll.operand) : t = (id,bnd)::c
  *)
 
 type uid_l = Ll.uid list
