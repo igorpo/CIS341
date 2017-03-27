@@ -142,6 +142,8 @@ let globals_tests = [
   ("atprograms/globals6.oat", "", "15");
 ]
 
+
+
 let path_tests = [
  ("atprograms/path1.oat", "", "17");
  ("atprograms/path2.oat", "", "35");
@@ -239,6 +241,11 @@ let old_student_tests = [
   ; ("atprograms/maxsubsequence.oat", "", "107")
 ]
 
+let our_tests = [
+  ("atprograms/globals5.oat", "", "17");
+  ("atprograms/globals6.oat", "", "15");
+]
+
 let tests : suite =
   [ 
     GradedTest("parse tests", 15, parse_tests);
@@ -248,6 +255,7 @@ let tests : suite =
     GradedTest("easy tests", 15, executed_oat_file easy_tests);
     GradedTest("medium tests", 10, executed_oat_file medium_tests);
     GradedTest("hard tests", 10, executed_oat_file (hard_tests @ old_student_tests));
+    (* GradedTest("our tests", 99, executed_oat_file our_tests); *)
   ]
 
 let manual_tests : suite = [

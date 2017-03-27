@@ -261,11 +261,13 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | CBool b -> (Ll.I1, Ll.Const (bool_to_int64 b),[])
   | CInt i -> (Ll.I64, Ll.Const i,[])
   | CStr s -> 
+     
      let str_gid = gensym "string" in
-     let typ = Ll.Ptr Ll.I8 in
-     let str_ginit = Ll.GString str_gid in
+     let typ = Ll.Array ((String.length s) + 1, Ll.I8) in
+     let str_ginit = Ll.GString s in
      let str_gdecl = (typ, str_ginit) in
      (typ, Ll.Gid str_gid, [G (str_gid, str_gdecl)])
+
   | CArr (typ, exp_node_list) -> failwith "CArr"
   | NewArr (typ, exp_node) -> failwith "NewArr"
   | Id i -> 
@@ -636,7 +638,9 @@ let rec cmp_gexp (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
   | CNull t -> ((cmp_ty t, Ll.GNull),[])
   | CBool b -> ((Ll.I1, Ll.GInt(bool_to_int64 b)),[])
   | CInt i -> ((Ll.I64, Ll.GInt i),[])
-  | CStr i -> ((Ll.Ptr Ll.I8, Ll.GString i),[])
+  | CStr s -> 
+    let gdecl = (Ll.Array ((String.length s) + 1, Ll.I8), Ll.GString s) in
+    (gdecl, [])
   (* | CArr (t, e_list) -> ((cmp_ty t, Ll.GArray ), List.map cmp_gexp e_list) *)
   | _ -> failwith "other case"
   end
