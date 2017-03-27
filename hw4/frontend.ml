@@ -241,18 +241,6 @@ let cmp_uop (b: Ast.unop) (op: Ll.operand) (t: Ll.ty) : Ll.insn =
      that compiles an expression and optionally inserts a bitcast to the
      desired Ll type. This is useful for dealing with OAT identifiers that
      correspond to gids that don't quite have the type you want
-
-  | CNull of ty                         (* null literal for any TRef *)
-  | CBool of bool                       (* bool literal *)
-  | CInt of int64                       (* int literal *)
-  | CStr of string                      (* string literal *)
-  | CArr of ty * exp node list          (* array literal *)
-  | NewArr of ty * exp node             (* zero-initialized arrays *)
-  | Id of id                            (* identifiers *)
-  | Index of exp node * exp node        (* index into an array *)
-  | Call of id * exp node list          (* function call *)
-  | Bop of binop * exp node * exp node  (* operations of two arguments *)
-  | Uop of unop * exp node    
 *)
 
 
@@ -277,8 +265,14 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
      let str_ginit = Ll.GString s in
      let str_gdecl = (typ, str_ginit) in
      (typ, Ll.Gid str_gid, [G (str_gid, str_gdecl)])
-  | CArr (typ, exp_node_list) -> failwith "CArr"
-  | NewArr (typ, exp_node) -> failwith "NewArr"
+  | CArr (typ, exp_node_list) -> 
+    (* let arr_ty, arr_op, arr_strm = oat_alloc_array typ (Ll.Const (Int64.of_int (List.length exp_node_list))) in
+    (arr_ty, arr_op, arr_strm) *)
+    failwith "CArr"
+  | NewArr (typ, exp_node) -> 
+    let exp_ty, exp_op, exp_strm = cmp_exp c exp_node in
+    let arr_ty, arr_op, arr_strm = oat_alloc_array typ exp_op in
+    (arr_ty, arr_op, exp_strm >@ arr_strm)
   | Id i -> 
     let typ, opr = Ctxt.lookup i c in
     begin match opr with
@@ -305,19 +299,10 @@ and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
   (* Printf.printf "load_helper"; *)
   let t1_ty, t1_op, t1_strm = a in
   begin match t1_ty, t1_op with
-  | (Ptr p, Gid g) -> Printf.printf "Hitting case 1: global '%s'\n" g;
+  | (Ptr p, Gid g) -> (* Printf.printf "Hitting case 1: global '%s'\n" g; *)
     let loaded_t1 = gensym "gl" in
-    begin match p with
-    (* 
-    | Ll.I8 -> 
-      let arr_ty = Ll.Ptr (Ll.Array (_, Ll.I8)) in
-      let casted_str = gensym "casted_str" in
-      let new_strm = t1_strm >@ [E (casted_str, Bitcast(arr_ty, t1_op, Ll.Ptr (Ll.I8)))] in 
-      (Ll.Ptr (Ll.I8), Ll.Id casted_str, new_strm) *)
-    | _ -> (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
-    end
-    
-  | (_, Gid g) -> Printf.printf "Hitting case 2\n";
+    (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
+  | (_, Gid g) -> (* Printf.printf "Hitting case 2\n"; *)
     let loaded_t1 = gensym "gl" in
     begin match t1_ty with
     | Ll.Array (int, Ll.I8) -> 
@@ -326,7 +311,6 @@ and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
       (Ll.Ptr (Ll.I8), Ll.Id casted_str, new_strm)
     | _ -> (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
     end
-
   | (Ptr p, _) ->
     (* Printf.printf "Hitting case 3\n"; *)
     let loaded_t1 = gensym "l" in
