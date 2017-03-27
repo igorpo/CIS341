@@ -362,55 +362,31 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       let typ, opr, strm = load_helper @@ cmp_exp c s in 
       if typ = rt then
         (c, strm 
-(*           >@ [T (Br ("end"))]
-          >@ [L ("end")] *)
           >@ [T (Ll.Ret (typ, Some opr))])
       else 
         (
-          (* Printf.printf "THIS IS WHERE WE ARE\n\n\n\n"; *)
           if typ = Ll.Ptr rt then
-
             let loaded_val = gensym "loaded" in
-            (* Printf.printf "THIS IS WHERE WE ARE\n\n\n\n"; *)
             (c, strm
-(*               >@ [T (Br ("end"))]
-              >@ [L ("end")]  *)
               >@ [I (loaded_val, Ll.Load (typ, opr))]
               >@ [T (Ll.Ret (rt, Some (Ll.Id loaded_val)))])
         else
           failwith "Incompatible return types")
     | None -> 
-      (* Printf.printf "None case"; *)
       if rt = Void then (c, [T (Ll.Ret (Void, None))])
       else failwith "Expected a void return type"
     end
   | Decl vd ->
     let id, expr = vd in 
-    (* Printf.printf "Declaring %s\n" id; *)
     let typ, opr, strm = load_helper @@ cmp_exp c expr in
     let new_c = Ctxt.add c id (Ll.Ptr typ, Ll.Id id) in
     (new_c, strm >@ [E (id, Ll.Alloca typ)] >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
   | Assn (lhs_exp, rhs_exp) -> 
     begin match lhs_exp.elt with
     | Id id -> 
-      (* Printf.printf "Assigning %s\n" id; *)
-      (* TODO: *)
       let rhs_typ, rhs_opr, rhs_strm = load_helper @@ cmp_exp c rhs_exp in
       let lhs_typ, lhs_opr, lhs_strm = cmp_exp c lhs_exp in
       (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (rhs_typ, rhs_opr, lhs_opr))])
-      (* begin match rhs_opr with
-      | Ll.Gid g -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, Ll.Gid g, lhs_opr))])
-      | Ll.Const con -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, Ll.Const con, lhs_opr))])
-      | Ll.Id id2 -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, opr, lhs_opr))])
-      | Ll.Null -> (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (typ2, opr, lhs_opr))])
-        (* TODO: verify that typ on (t,o) case is right *)
-        
-        (* begin match Ctxt.lookup id c with
-        | (t, o) -> (c, strm >@ [I (id, Ll.Store (t, opr, Ll.Id id))])
-        | _ -> (c, strm >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
-        end *)
-      end *)
-        
     | Index (e_n1, e_n2) -> failwith "Index (e_n1, e_n2)"
     | _ -> failwith "program is not well-formed"
     end
@@ -423,7 +399,6 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     let l1 = gensym "then" in
     let l2 = gensym "else" in 
     let l3 = gensym "end_if" in 
-    (* and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream = *)
     let new_op, load_strm = safe_ptr_usage t op in
     let strm = c_strm 
       >@ [T (Br (l0))]
@@ -477,7 +452,6 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     let typ, while_opr, while_strm = cmp_exp c while_cond_exp in
     begin match typ with
     | Ll.I1 -> 
-      (* cmp_stmt c typ (Ast.no_loc (Ast.If (exp_node, block1, []))) *)
       let cmp_while_block = cmp_block c typ while_block in 
       let l0 = gensym "begin_while" in 
       let l1 = gensym "while_block" in 
@@ -492,7 +466,6 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
         >@ cmp_while_block
         >@ [T (Br (l0))]
         >@ [L (l2)]
-        (* >@ [T (Br ("end"))] *)
       in 
       (c, strm)
     | _ -> failwith "operand not a boolean"
@@ -535,16 +508,16 @@ let rec ty_cmp_helper (l: (Ast.ty * id) list) : Ll.ty list =
   | [] -> []
   end
 
+
 let cmp_global_ctxt_hlpr (c:Ctxt.t) (p:Ast.decl) : Ctxt.t =
+  
   begin match p with
   | Gvdecl g ->
     let id = g.elt.name in
-    let typ, opr, _ = cmp_exp c g.elt.init in
-    (* Printf.printf "Coming from here %s\n" id; *)
+    let typ = cmp_ty @@ expr_type g.elt.init.elt in
     Ctxt.add c g.elt.name (typ, Ll.Gid id)
   | Gfdecl f -> 
     let fn = f.elt.name in
-    (* Printf.printf "Adding function '%s'\n\n" fn; *)
     let ret_typ = cmp_ty f.elt.rtyp in
     let args = ty_cmp_helper f.elt.args in
     Ctxt.add c fn (Ll.Fun ((args, ret_typ)), Ll.Gid fn)
@@ -603,13 +576,11 @@ type ty_l = Ll.ty list
 let cmp_fdecl_helper (a:Ctxt.t * uid_l * ty_l * stream) (d:ty * id) : Ctxt.t * uid_l * ty_l * stream =
   let c, u_l, t_l, strm = a in
   let ast_ty, new_id = d in
-  (* Printf.printf "Saving %s to context\n\n\n" new_id; *)
   let new_ty = cmp_ty ast_ty in
   begin match new_ty with
   | I1 | I8 | I64 -> 
     let lcl = gensym "lcl" in
     let new_strm = strm >@ [I (lcl, Ll.Alloca new_ty)] >@ [I (lcl, Ll.Store (new_ty, Ll.Id new_id, Ll.Id lcl))] in
-    (* Printf.printf "New id == %s\n\n\n\n" new_id; *)
     let new_c = Ctxt.add c new_id (Ll.Ptr new_ty, Ll.Id lcl) in
     (new_c, u_l @ [new_id], t_l @ [new_ty], new_strm)
   | _ -> 
@@ -640,38 +611,23 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
 
    - OAT arrays are always handled via pointers. A global array of arrays will
      be an array of pointers to arrays emitted as additional global declarations
-
-    gdecl = ty * ginit
-
-type ty =
-  | Void                            (* mix of unit/bottom from C *)
-  | I1 | I8 | I64                   (* integer types             *)
-  | Ptr of ty                       (* t*                        *)
-  | Struct of ty list               (* { t1, t2, ... , tn }      *)
-  | Array of int * ty               (* [ NNN x t ]               *)
-  | Fun of fty                      (* t1, ..., tn -> tr         *)
-  | Namedt of tid                   (* named type aliases        *)
-
-    type ginit = 
-  | GNull                     (* null literal             *)
-  | GGid of gid               (* reference another global *)
-  | GInt of int64             (* global integer value     *)
-  | GString of string         (* constant global string   *)
-  | GArray of gdecl list      (* global array             *)
-  | GStruct of gdecl list     (* global struct            *)
-
  *)
-
 let rec cmp_gexp (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
   begin match e.elt with 
   | CNull t -> ((cmp_ty t, Ll.GNull),[])
   | CBool b -> ((Ll.I1, Ll.GInt(bool_to_int64 b)),[])
   | CInt i -> ((Ll.I64, Ll.GInt i),[])
-  | CStr s -> 
-    let gdecl = (Ll.Array ((String.length s) + 1, Ll.I8), Ll.GString s) in
+  | CStr s -> let gdecl = (Ll.Array ((String.length s) + 1, Ll.I8), Ll.GString s) in
     (gdecl, [])
-  (* | CArr (t, e_list) -> ((cmp_ty t, Ll.GArray ), List.map cmp_gexp e_list) *)
-  | _ -> failwith "other case"
+  | CArr (t, e_list) -> 
+    let el_type = cmp_ty t in
+    let num_of_els = List.length e_list in
+    let arr_type = Ll.Struct ([el_type; (Ll.Array ((num_of_els), el_type))]) in
+    let len_el = [ (Ll.I64, Ll.GInt (Int64.of_int @@ num_of_els)) ] in
+    let gdecls_list = List.map (fun (i,j) -> i) (List.map cmp_gexp e_list) in
+    let array_el = [ (Ll.Array (num_of_els, el_type),Ll.GArray (gdecls_list)) ] in
+    ((arr_type, Ll.GStruct (len_el @ array_el) ), [])
+  | _ -> failwith "Error for other cases"
   end
 
 
@@ -708,9 +664,11 @@ let cmp_prog (p:Ast.prog) : Ll.prog =
     List.fold_right (fun d (fs, gs) ->
         match d with
         | Ast.Gvdecl { elt=gd } -> 
+           (* Printf.printf "gd.name == %s\n" gd.name; *)
            let ll_gd, gs' = cmp_gexp gd.init in
            (fs, (gd.name, ll_gd)::gs' @ gs)
         | Ast.Gfdecl fd ->
+           (* Printf.printf "fd.elt.name == %s\n" fd.elt.name; *)
            let fdecl, gs' = cmp_fdecl c fd in
            (fd.elt.name,fdecl)::fs, gs' @ gs
       ) p ([], [])
