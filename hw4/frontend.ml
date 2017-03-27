@@ -340,7 +340,7 @@ and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : 
  *)
 
 let safe_ptr_usage (t:Ll.ty) (op:Ll.operand) : Ll.operand * stream =
-  begin match op with;
+  begin match op with
     | Gid g -> let _, o, str = load_helper (t,op,[]) in (o, str)
     | _ -> (op, [])
   end
@@ -415,34 +415,35 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
     in 
     (c, strm)
   | For (vd_list, cnd_option,
-           incr_option, b) -> 
+           incr_option, body) -> 
     let vd_strm = for_decl_helper c vd_list in
 
     (* conditional section *) 
     let cnd_ty, cnd_opr, cnd_strm = 
     begin match cnd_option with 
     | Some s -> cmp_exp c s 
-    | None -> cmp_exp c (Ast.no_loc (Ll.Const (Ast.CBool(true))))
+    | None -> cmp_exp c (Ast.no_loc (Ast.CBool true))
     end in 
 
     (* incrementer section *)
-    let _, _, incr_strm =
+    let new_c, incr_strm =
     begin match incr_option with 
-    | Some s -> cmp_exp c s 
-    | None -> _, _, []
+    | Some s -> cmp_stmt c Ll.Void s 
+    | None -> c, []
     end in 
 
-    let c_b = cmp_block c in 
+    let loop_body = cmp_block new_c cnd_ty body in 
     let l0 = gensym "begin_for" in 
     let l1 = gensym "for_block" in 
     let l2 = gensym "end_for" in 
-    let new_op, load_strm = safe_ptr_usage typ cnd_opr in 
+    let new_op, load_strm = safe_ptr_usage cnd_ty cnd_opr in 
     let strm = vd_strm 
       >@ [T (Br (l0))]
-      >@ cnd_strm 
+      >@ cnd_strm
+      >@ load_strm
       >@ [T (Cbr (new_op, l1, l2))]
       >@ [L (l1)]
-      >@ c_b 
+      >@ loop_body 
       >@ incr_strm
       >@ [T (Br (l0))]
       >@ [L (l2)]
