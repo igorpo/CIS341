@@ -1,9 +1,6 @@
-int abc(int x) {
-	x = x+1;
-	return x;
-}
+global arr1 = int[]{0,1,2};
 
 int program (int argc, string[] argv) {
-  var y = abc(1);
-  return y;
+  var x = arr1[0];
+  return x;
 }

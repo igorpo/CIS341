@@ -242,20 +242,22 @@ let old_student_tests = [
 ]
 
 let our_tests = [
-  ("atprograms/run61.oat", "", "3410");
+  (* ("atprograms/run61.oat", "", "3410"); *)
+  ("atprograms/ss.oat", "", "0");
   (* ("atprograms/globals5.oat", "", "17"); *)
 ]
 
 let tests : suite =
   [ 
-    GradedTest("parse tests", 15, parse_tests);
+    (* GradedTest("parse tests", 15, parse_tests);
     GradedTest("easiest tests", 15, executed_oat_file easiest_tests);
     GradedTest("globals tests", 15, executed_oat_file globals_tests);
     GradedTest("path tests", 10, executed_oat_file path_tests);
     GradedTest("easy tests", 15, executed_oat_file easy_tests);
     GradedTest("medium tests", 10, executed_oat_file medium_tests);
-    GradedTest("hard tests", 10, executed_oat_file (hard_tests @ old_student_tests));
-    (* GradedTest("our tests", 99, executed_oat_file our_tests); *)
+    GradedTest("hard tests", 10, executed_oat_file (hard_tests @ old_student_tests)); *)
+    
+    GradedTest("our tests", 99, executed_oat_file our_tests);
   ]
 
 let manual_tests : suite = [

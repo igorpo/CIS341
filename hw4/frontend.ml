@@ -173,8 +173,7 @@ let rec expr_type (exp: Ast.exp) : Ast.ty =
   | CBool _ -> TBool
   | CInt _ -> TInt
   | CStr s -> TRef (RString)
-  | CArr (t, _) -> t 
-  | NewArr (t, _) -> t
+  | NewArr (t, _) -> TRef (RArray t)
   | Id _ -> TRef (RString) (* string ??? *)
   | Index (e1, _) -> expr_type e1.elt (* e1[e2] e1 should be type? *)
   | Bop (b, _, _) ->
@@ -193,6 +192,7 @@ let rec expr_type (exp: Ast.exp) : Ast.ty =
 let global_expr_type (exp:Ast.exp) : Ll.ty =
   begin match exp with
   | CStr s -> Ll.Array ((String.length s) + 1, Ll.I8)
+  | CArr (t, exp_list) -> Ll.Ptr (Ll.Struct [I64; Ll.Array(List.length exp_list, cmp_ty t)])
   | _ -> cmp_ty @@ expr_type exp
   end
 
@@ -282,6 +282,7 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     let t, op, strm = oat_alloc_array typ inner_op in 
     (t, op, inner_strm >@ strm)
   | Id i -> 
+    Printf.printf "I think it's an Id %s\n" i; 
     let typ, opr = Ctxt.lookup i c in
     begin match opr with
     | Gid g -> (typ, Ll.Gid g, [])
@@ -292,11 +293,11 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   | Index (e1, e2) -> 
     let arr_t, arr_op, arr_strm = cmp_exp c e1 in 
     let idx_t, idx_op, idx_strm = load_helper @@ cmp_exp c e2 in 
-    let id = gensym "idx" in 
+    let id = gensym "gep" in 
     (* let id2 = gensym "load_gep" in *)
-    (Ll.Ptr idx_t, Ll.Id id, arr_strm 
+    (idx_t, Ll.Id id, arr_strm 
       >@ idx_strm 
-      >@ [I (id, Ll.Gep (arr_t, arr_op, [Ll.Const 1L; Ll.Const 0L]))])
+      >@ [I (id, Ll.Gep (arr_t, arr_op, [idx_op]))])
       (* >@ [I (id2, Ll.Load (Ll.id, Ll.id2))]) *)
   | Call (i, exp_node_list) ->
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
@@ -413,8 +414,9 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
             (c, strm
               >@ [I (loaded_val, Ll.Load (typ, opr))]
               >@ [T (Ll.Ret (rt, Some (Ll.Id loaded_val)))])
-        else
-          failwith "Incompatible return types")
+          else
+            failwith "Incompatible return types"
+        )
     | None -> 
       if rt = Void then (c, [T (Ll.Ret (Void, None))])
       else failwith "Expected a void return type"
