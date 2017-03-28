@@ -262,7 +262,6 @@ type arg_list = (Ll.ty * Ll.operand) list
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   begin match exp.elt with 
   | Bop (b, e1, e2) -> 
-    (* Printf.printf "Bop"; *)
     let t = expr_type (Bop (b, e1, e2)) in 
     let id = gensym "bop" in
     let t1, op1, strm1 = load_helper @@ cmp_exp c e1 in
@@ -278,7 +277,10 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
      let str_gdecl = (typ, str_ginit) in
      (typ, Ll.Gid str_gid, [G (str_gid, str_gdecl)])
   | CArr (typ, exp_node_list) -> failwith "CArr"
-  | NewArr (typ, exp_node) -> failwith "NewArr"
+  | NewArr (typ, exp_node) -> 
+    let inner_ty, inner_op, inner_strm = cmp_exp c exp_node in  
+    let t, op, strm = oat_alloc_array typ inner_op in 
+    (t, op, inner_strm >@ strm)
   | Id i -> 
     let typ, opr = Ctxt.lookup i c in
     begin match opr with
@@ -287,11 +289,18 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     | Const c -> (typ, Ll.Id i, [])
     | Null -> (typ, Ll.Id i, [])
     end
-    
-  | Index (exp_node1, exp_node2) -> failwith "Index" 
+  | Index (e1, e2) -> 
+    let arr_t, arr_op, arr_strm = cmp_exp c e1 in 
+    let idx_t, idx_op, idx_strm = load_helper @@ cmp_exp c e2 in 
+    let id = gensym "idx" in 
+    (* let id2 = gensym "load_gep" in *)
+    (Ll.Ptr idx_t, Ll.Id id, arr_strm 
+      >@ idx_strm 
+      >@ [I (id, Ll.Gep (arr_t, arr_op, [Ll.Const 1L; Ll.Const 0L]))])
+      (* >@ [I (id2, Ll.Load (Ll.id, Ll.id2))]) *)
   | Call (i, exp_node_list) ->
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
-    let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
+    let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c, [], []) ty_list exp_node_list in
     let lbl = gensym i in
     (typ, Ll.Id lbl, streams >@ [I (lbl, Ll.Call (typ, ll_op, ty_op_list))])
   | Uop (uop1, e1) -> 
