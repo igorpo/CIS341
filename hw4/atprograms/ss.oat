@@ -1,6 +1,7 @@
-global arr1 = int[]{0,1,2};
+global arr = int[]{1,2,3,4,5};
+global hello = "hello";
 
-int program (int argc, string[] argv) {
-  var x = arr1[0];
-  return x;
+int program(int argc, string[] args) {
+  var x = "he";
+  return arr[1];
 }
