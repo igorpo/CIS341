@@ -1,0 +1,31 @@
+int mod_ten (int n) {
+	if (n < 10) {
+		return n;
+	}
+
+	return mod_ten (n - 10);
+}
+
+int div_ten (int n) {
+	var c = 0;
+	while (n >= 10) {
+		n = n - 10;
+		c = c + 1;
+	}
+	return c;
+}
+
+int reversed (int n) {
+	var r = 0;
+	while (n != 0) {
+		var n_mod_ten = mod_ten(n);
+		r = (r * 10) + n_mod_ten;
+		n = div_ten(n);
+	}
+	return r;
+}
+
+int program (int argc, string[] argv) {
+	var n = 321;
+	return reversed(n);
+}
