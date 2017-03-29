@@ -286,7 +286,19 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
      let str_ginit = Ll.GString s in
      let str_gdecl = (typ, str_ginit) in
      (typ, Ll.Gid str_gid, [G (str_gid, str_gdecl)])
-  | CArr (typ, exp_node_list) -> failwith "CArr"
+  | CArr (typ, exp_node_list) -> 
+    let arr_len = (Ll.Const (Int64.of_int (List.length exp_node_list))) in
+    let arr_ty, arr_op, arr_strm = oat_alloc_array typ arr_len in 
+    let streams, _ = List.fold_left (fun (s,i) el -> 
+        let index_op = Ll.Const (Int64.of_int i) in
+        let el_ty, el_op, el_st = cmp_exp c el in
+        let arr_el_id = gensym "arr_el_gep" in 
+        let strm = el_st 
+        >@ [I (arr_el_id, Ll.Gep (arr_ty, arr_op, [Ll.Const 0L; Ll.Const 1L; index_op]))]
+        >@ [I ("", Ll.Store (el_ty, el_op, Ll.Id arr_el_id))] in
+        (s >@ strm, i + 1)
+      ) ([], 0) exp_node_list in
+    (arr_ty, arr_op, arr_strm >@ streams)
   | NewArr (typ, exp_node) -> 
     let inner_ty, inner_op, inner_strm = cmp_exp c exp_node in  
     let t, op, strm = oat_alloc_array typ inner_op in 
@@ -325,11 +337,12 @@ and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
   (* Printf.printf "load_helper"; *)
   let t1_ty, t1_op, t1_strm = a in
   begin match t1_ty, t1_op with
+    
     | (Ptr p, Gid g) -> 
-      (* Printf.printf "Hitting case 1: global '%s'\n" g; *)
+      Printf.printf "Hitting case 1: global '%s'\n\n\n\n\n\n" g;
       let loaded_t1 = gensym "gl" in
       begin match p with
-      | _ -> (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
+      | _ -> a(* (Ll.Ptr t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))]) *)
       end
       
     | (_, Gid g) -> 
@@ -395,9 +408,10 @@ and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : 
  *)
 
 let safe_ptr_usage (t:Ll.ty) (op:Ll.operand) : Ll.operand * stream =
-  begin match op with
-    | Gid g -> let _, o, str = load_helper (t,op,[]) in (o, str)
-    | _ -> (op, [])
+  begin match t, op with
+    | (Ptr p, _) -> let _, o, str = load_helper (t,op,[]) in (o, str)
+    | (_, Gid g) -> let _, o, str = load_helper (t,op,[]) in (o, str)
+    | (_,_) -> (op, [])
   end
 
 (* let rec for_decl_helper (c: Ctxt.t) (vd_l: vdecl list) : stream =

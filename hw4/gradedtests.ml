@@ -243,7 +243,8 @@ let old_student_tests = [
 
 let our_tests = [
   (* ("atprograms/run61.oat", "", "3410"); *)
-  ("atprograms/lib9.oat", "a b c d", "abcd5");
+  (* ("atprograms/lib9.oat", "a b c d", "abcd5"); *)
+  ("atprograms/run21.oat", "", "99");
   (* ("atprograms/ss.oat", "", "2"); *)
   (* ("atprograms/globals5.oat", "", "17"); *)
 ]
