@@ -1,0 +1,35 @@
+
+void gnomeSort(int[] a, int len) {
+  var i = 1;
+  var j = 2;
+
+  while(i < len) {
+    if (a[i-1] <= a[i]) {
+      i = j;
+      j = j + 1;
+    } else {
+      var tmp = a[i-1];
+      a[i-1] = a[i];
+      a[i] = tmp;
+      i = i - 1;
+
+      if (i == 0) {
+        i = j;
+        j = j + 1;
+      }
+    }
+  }
+  return;
+}
+
+int program(int argc, string[] argv) {
+  var arr = new int[]{ 5, 200, 1, 65, 30, 99, 2, 0 };
+  var len = 8;
+
+  gnomeSort(arr, len);
+  for(var i=0; i<8; i=i+1;) {
+    print_int(arr[i]);
+  }
+
+  return 0;
+}

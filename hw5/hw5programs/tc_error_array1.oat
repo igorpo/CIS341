@@ -1,0 +1,5 @@
+int program(int argc, string[] argv) {
+  var arr = new int[] {4, 5};
+  arr[1] = true;
+  return arr[0];
+}

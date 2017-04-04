@@ -1,0 +1,15 @@
+struct Point {
+  int x;
+  int y;
+  int z
+}
+
+global x = Point[] {Point {x = 3; y = 4; z = 5}, Point {x = 1; y = 2; z = 3}};
+
+int program(int argc, string[] argv) {
+  var i = 0;
+  for (var j = 0; j < 2; j = j + 1;) {
+    i = i + x[j].y;
+  }
+  return i;
+}

@@ -1,0 +1,14 @@
+global i = 19;
+global b1 = true;
+global b2 = false;
+global str = "This is a string!";
+global arr1 = int[]{0,1,2};
+global arr2 = int[][]{ int[]{10,11}, int[]{20,21}, int[]{30,31}};
+global arr3 = string[]{"String1", "String2", "String3"};
+
+global arr4 = string[][]
+  {
+   string[]{"String00","String01"}, 
+   string[]{"String10","String11"}, 
+   string[]{"String20","String21"}
+  };

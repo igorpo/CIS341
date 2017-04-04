@@ -1,0 +1,4 @@
+int program(int argc, string[] argv) {
+  var x = new (int[])[] { int[] null };
+  return x[0][1];
+}

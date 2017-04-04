@@ -1,0 +1,6 @@
+int i = 341;
+
+int f() {
+  int i = 0;
+  return i;
+}

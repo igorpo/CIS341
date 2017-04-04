@@ -1,0 +1,6 @@
+int program (int argc, string[] argv) {
+  int x = 10;
+  int[][] a = new int[][3]{ i => new int[3]{ j => x+i+j }};
+  int[][] b = a;
+  return b[2][3]; 
+}

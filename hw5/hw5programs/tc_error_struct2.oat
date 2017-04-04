@@ -1,0 +1,9 @@
+struct S {
+  int f1;
+  int f2
+}
+
+int program(int argc, string[] argv) {
+  var x = new S { f1 = 4; f2 = 3; f3 = 4 };
+  return x.f1;
+}

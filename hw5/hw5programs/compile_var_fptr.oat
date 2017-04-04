@@ -1,0 +1,6 @@
+int id(int x) { return x; }
+
+int program(int argc, string[] argv) {
+  var id_local = id;
+  return id_local(1);
+}

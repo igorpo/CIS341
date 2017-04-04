@@ -1,0 +1,5 @@
+int program (int argc, string[] argv) {
+  int i=999;
+  int[] a = {1, 100, 999};
+  return a[2];
+}

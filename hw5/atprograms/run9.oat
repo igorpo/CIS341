@@ -1,0 +1,5 @@
+int program (int argc, string[] argv) {
+  var arr=new int[][] {new int []{1,2}, new int[]{3,4}};
+
+  return arr[1][1];
+}

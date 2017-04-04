@@ -106,6 +106,12 @@ let bool_to_int64 (b:bool) : int64 =
 *)
 
 
+let rec get_arr_el_t (t:Ll.ty) : Ll.ty =
+  begin match t with
+  | Ll.Struct (_::[Ll.Array(_, typ)]) -> typ
+  | Ll.Ptr (Ll.Struct (_::[Ll.Array(_, typ)])) -> typ
+  | _ -> t
+  end
 
 
 let rec cmp_ty : Ast.ty -> Ll.ty = function
@@ -173,8 +179,7 @@ let rec expr_type (exp: Ast.exp) : Ast.ty =
   | CBool _ -> TBool
   | CInt _ -> TInt
   | CStr s -> TRef (RString)
-  | CArr (t, _) -> t 
-  | NewArr (t, _) -> t
+  | NewArr (t, _) -> TRef (RArray t)
   | Id _ -> TRef (RString) (* string ??? *)
   | Index (e1, _) -> expr_type e1.elt (* e1[e2] e1 should be type? *)
   | Bop (b, _, _) ->
@@ -190,9 +195,12 @@ let rec expr_type (exp: Ast.exp) : Ast.ty =
   | _ -> failwith "unmatched"
   end
 
-let global_expr_type (exp:Ast.exp) : Ll.ty =
+let rec global_expr_type (exp:Ast.exp) : Ll.ty =
   begin match exp with
   | CStr s -> Ll.Array ((String.length s) + 1, Ll.I8)
+  | CArr (t, exp_list) -> 
+    let el_ty = global_expr_type (List.hd exp_list).elt in
+    Ll.Ptr (Ll.Struct [I64; Ll.Array(List.length exp_list, el_ty)])
   | _ -> cmp_ty @@ expr_type exp
   end
 
@@ -244,13 +252,14 @@ let cmp_uop (b: Ast.unop) (op: Ll.operand) (t: Ll.ty) : Ll.insn =
 *)
 
 
+
+
 type arg_list = (Ll.ty * Ll.operand) list
 
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
   begin match exp.elt with 
   | Bop (b, e1, e2) -> 
-    (* Printf.printf "Bop"; *)
     let t = expr_type (Bop (b, e1, e2)) in 
     let id = gensym "bop" in
     let t1, op1, strm1 = load_helper @@ cmp_exp c e1 in
@@ -265,15 +274,28 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
      let str_ginit = Ll.GString s in
      let str_gdecl = (typ, str_ginit) in
      (typ, Ll.Gid str_gid, [G (str_gid, str_gdecl)])
-  | CArr (typ, exp_node_list) -> 
-    (* let arr_ty, arr_op, arr_strm = oat_alloc_array typ (Ll.Const (Int64.of_int (List.length exp_node_list))) in
-    (arr_ty, arr_op, arr_strm) *)
-    failwith "CArr"
+  | CArr (typ, exp_node_list) ->     
+    (* Printf.printf "CArr\n\n\n\n"; *)
+    let arr_len = (Ll.Const (Int64.of_int (List.length exp_node_list))) in
+    (* let arr_ty_constr = Ll.Struct  *)
+    let arr_ty, arr_op, arr_strm = oat_alloc_array typ arr_len in 
+    let streams, _ = List.fold_left (fun (s,i) el -> 
+        let index_op = Ll.Const (Int64.of_int (i)) in
+        let el_ty, el_op, el_st = cmp_exp c el in
+        let arr_el_id = gensym "arr_el_gep" in 
+        let strm = el_st 
+        >@ [I (arr_el_id, Ll.Gep (arr_ty, arr_op, [Ll.Const (0L); Ll.Const (1L); index_op]))]
+        >@ [I (arr_el_id, Ll.Store (el_ty, el_op, Ll.Id arr_el_id))] in
+        (s >@ strm, i + 1)
+      ) (arr_strm, 0) exp_node_list in
+    (arr_ty, arr_op, streams)
   | NewArr (typ, exp_node) -> 
+    (* Printf.printf "NEW ARR\n\n\n\n"; *)
     let exp_ty, exp_op, exp_strm = cmp_exp c exp_node in
     let arr_ty, arr_op, arr_strm = oat_alloc_array typ exp_op in
     (arr_ty, arr_op, exp_strm >@ arr_strm)
   | Id i -> 
+    (* Printf.printf "Think it's id %s\n\n\n" i; *)
     let typ, opr = Ctxt.lookup i c in
     begin match opr with
     | Gid g -> (typ, Ll.Gid g, [])
@@ -281,11 +303,20 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     | Const c -> (typ, Ll.Id i, [])
     | Null -> (typ, Ll.Id i, [])
     end
-    
-  | Index (exp_node1, exp_node2) -> failwith "Index" 
+  | Index (e1, e2) -> 
+    let arr_t, arr_op, arr_strm = cmp_exp c e1 in 
+    let arr_el_t = get_arr_el_t arr_t in
+    let idx_t, idx_op, idx_strm = load_helper @@ cmp_exp c e2 in 
+    let id = gensym "gep" in 
+    (* let id2 = gensym "load_gep" in *)
+    (Ll.Ptr arr_el_t, Ll.Id id, arr_strm 
+      >@ idx_strm 
+      >@ [I (id, Ll.Gep (arr_t, arr_op, [Ll.Const 0L; Ll.Const 1L; idx_op]))])
+
   | Call (i, exp_node_list) ->
+    (* Printf.printf "test\n\n"; *)
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
-    let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
+    let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c, [], []) ty_list exp_node_list in
     let lbl = gensym i in
     (typ, Ll.Id lbl, streams >@ [I (lbl, Ll.Call (typ, ll_op, ty_op_list))])
   | Uop (uop1, e1) -> 
@@ -299,33 +330,53 @@ and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
   (* Printf.printf "load_helper"; *)
   let t1_ty, t1_op, t1_strm = a in
   begin match t1_ty, t1_op with
-  | (Ptr p, Gid g) -> (* Printf.printf "Hitting case 1: global '%s'\n" g; *)
-    let loaded_t1 = gensym "gl" in
-    (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
-  | (_, Gid g) -> (* Printf.printf "Hitting case 2\n"; *)
-    let loaded_t1 = gensym "gl" in
-    begin match t1_ty with
-    | Ll.Array (int, Ll.I8) -> 
-      let casted_str = gensym "casted_str" in
-      let new_strm = t1_strm >@ [E (casted_str, Bitcast(Ll.Ptr t1_ty, t1_op, Ll.Ptr (Ll.I8)))] in 
-      (Ll.Ptr (Ll.I8), Ll.Id casted_str, new_strm)
-    | _ -> (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
-    end
-  | (Ptr p, _) ->
-    (* Printf.printf "Hitting case 3\n"; *)
-    let loaded_t1 = gensym "l" in
-    (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
-  | _ -> a
+    | (Ptr p, Gid g) -> 
+      Printf.printf "Hitting case 1: global '%s'\n\n\n\n\n\n" g;
+      (* let loaded_t1 = gensym "gl" in *)
+      begin match p with
+      | _ -> (Ll.Ptr t1_ty, t1_op(* Ll.Id loaded_t1 *), t1_strm (* >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))] *))
+      end
+      
+    | (_, Gid g) -> 
+      (* Printf.printf "Hitting case 2\n\n\n"; *)
+      let loaded_t1 = gensym "gl" in
+      begin match t1_ty with
+      | Ll.Array (int, Ll.I8) -> 
+        let casted_str = gensym "casted_str" in
+        let new_strm = t1_strm >@ [E (casted_str, Bitcast(Ll.Ptr t1_ty, t1_op, Ll.Ptr (Ll.I8)))] in 
+        (Ll.Ptr (Ll.I8), Ll.Id casted_str, new_strm)
+      | _ -> (t1_ty, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (Ll.Ptr t1_ty, t1_op))])
+      end
+    | (Ptr p, _) ->
+      (* Printf.printf "Hitting case 3\n"; *)
+      begin match p with
+      | Ll.Array (int, Ll.I8) -> 
+        (* Printf.printf "Matched here casted_str!!!\n\n\n\n";  *)
+        let casted_str = gensym "casted_str" in
+        let new_strm = t1_strm >@ [E (casted_str, Bitcast(Ll.Ptr p, t1_op, Ll.Ptr (Ll.I8)))] in 
+        (Ll.Ptr (Ll.I8), Ll.Id casted_str, new_strm)
+      
+      | _ -> let loaded_t1 = gensym "l" in
+      (p, Ll.Id loaded_t1, t1_strm >@ [I (loaded_t1, Ll.Load (t1_ty, t1_op))])
+      end
+      
+    | _ ->  a
   end
 
 and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : Ctxt.t * arg_list * stream =
   let ctxt, args, str = c in
   let _type, _opr, _str = cmp_exp ctxt a in
   if _type <> t then
-    let arg_type, arg_operand, arg_stream = load_helper @@ cmp_exp ctxt a in
+    let arg_type, arg_operand, arg_stream = load_helper @@ (_type, _opr, _str) in
     (ctxt, args @ [(arg_type, arg_operand)], str >@ arg_stream)
   else
-    (ctxt, args @ [(_type, _opr)], str >@ _str)
+    begin match _opr with
+    | Ll.Gid g ->
+      let arg_type, arg_operand, arg_stream = load_helper @@ (_type, _opr, _str) in
+      (ctxt, args @ [(arg_type, arg_operand)], str >@ arg_stream)
+    | _ -> (ctxt, args @ [(_type, _opr)], str >@ _str)
+    end
+    
 
 
 (* Compile a statement in context c with return typ rt. Return a new context,
@@ -356,9 +407,10 @@ and zip_args_w_type (c:Ctxt.t * arg_list * stream) (t:Ll.ty) (a:Ast.exp node) : 
  *)
 
 let safe_ptr_usage (t:Ll.ty) (op:Ll.operand) : Ll.operand * stream =
-  begin match op with
-    | Gid g -> let _, o, str = load_helper (t,op,[]) in (o, str)
-    | _ -> (op, [])
+  begin match t, op with
+    | (Ptr p, _) -> let _, o, str = load_helper (t,op,[]) in (o, str)
+    | (_, Gid g) -> let _, o, str = load_helper (t,op,[]) in (o, str)
+    | (_,_) -> (op, [])
   end
 
 (* let rec for_decl_helper (c: Ctxt.t) (vd_l: vdecl list) : stream =
@@ -388,14 +440,16 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
             (c, strm
               >@ [I (loaded_val, Ll.Load (typ, opr))]
               >@ [T (Ll.Ret (rt, Some (Ll.Id loaded_val)))])
-        else
-          failwith "Incompatible return types")
+          else
+            failwith "Incompatible return types"
+        )
     | None -> 
       if rt = Void then (c, [T (Ll.Ret (Void, None))])
       else failwith "Expected a void return type"
     end
   | Decl vd ->
     let id, expr = vd in 
+    (* Printf.printf "declaration %s\n" id; *)
     let typ, opr, strm = load_helper @@ cmp_exp c expr in
     let new_c = Ctxt.add c id (Ll.Ptr typ, Ll.Id id) in
     (new_c, strm >@ [E (id, Ll.Alloca typ)] >@ [I (id, Ll.Store (typ, opr, Ll.Id id))])
@@ -405,11 +459,19 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       let rhs_typ, rhs_opr, rhs_strm = load_helper @@ cmp_exp c rhs_exp in
       let lhs_typ, lhs_opr, lhs_strm = cmp_exp c lhs_exp in
       (c, rhs_strm >@ lhs_strm >@ [I (id, Ll.Store (rhs_typ, rhs_opr, lhs_opr))])
-    | Index (e_n1, e_n2) -> failwith "Index (e_n1, e_n2)"
+    | Index (arr, ind) -> 
+      let arr_typ, arr_opr, arr_strm = cmp_exp c arr in
+      let ind_typ, ind_opr, ind_strm = load_helper @@ cmp_exp c ind in
+      let rhs_typ, rhs_opr, rhs_strm = load_helper @@ cmp_exp c rhs_exp in
+      let gep_id = gensym "gep" in 
+      (c, rhs_strm >@ arr_strm >@ ind_strm
+      >@ [I (gep_id, Ll.Gep (arr_typ, arr_opr, [Ll.Const 0L; Ll.Const (1L); ind_opr]))]
+      >@ [I (gep_id, Ll.Store (rhs_typ, rhs_opr, Ll.Id gep_id))]
+      )
     | _ -> failwith "program is not well-formed"
     end
   | SCall (i, exp_node_list) -> 
-    
+    (* Printf.printf "Scall\n\n\n"; *)
     let (ty_list, typ), ll_op = Ctxt.lookup_function i c in
     let _, ty_op_list, streams = List.fold_left2 zip_args_w_type (c,[], []) ty_list exp_node_list in
     let lbl = gensym i in
@@ -603,16 +665,26 @@ let rec cmp_gexp (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
   | CNull t -> ((cmp_ty t, Ll.GNull),[])
   | CBool b -> ((Ll.I1, Ll.GInt(bool_to_int64 b)),[])
   | CInt i -> ((Ll.I64, Ll.GInt i),[])
-  | CStr s -> let gdecl = (Ll.Array ((String.length s) + 1, Ll.I8), Ll.GString s) in
-    (gdecl, [])
+  | CStr s -> 
+    let gdecl = (Ll.Array ((String.length s) + 1, Ll.I8), Ll.GString s) in
+    (* let gid = gensym "g_str" in *)
+    (gdecl, [(* (gid, gdecl) *)])
   | CArr (t, e_list) -> 
-    let el_type = cmp_ty t in
     let num_of_els = List.length e_list in
-    let arr_type = Ll.Struct ([el_type; (Ll.Array ((num_of_els), el_type))]) in
+    let el_type = 
+      begin match t with
+      | Ast.TRef (Ast.RString) -> Ll.Array (num_of_els + 1, Ll.I8)
+      | _ -> cmp_ty t
+    end in
+    let arr_type = Ll.Struct ([Ll.I64; (Ll.Array ((num_of_els), el_type))]) in
     let len_el = [ (Ll.I64, Ll.GInt (Int64.of_int @@ num_of_els)) ] in
-    let gdecls_list = List.map (fun (i,j) -> i) (List.map cmp_gexp e_list) in
-    let array_el = [ (Ll.Array (num_of_els, el_type),Ll.GArray (gdecls_list)) ] in
-    ((arr_type, Ll.GStruct (len_el @ array_el) ), [])
+    (* (Ll.gdecl * (Ll.gid * Ll.gdecl) list) list *)
+    (* let gdecls_list = List.map cmp_gexp e_list in  *)
+    let gdecls_list = List.map (fun (i,j) -> i) (List.map cmp_gexp e_list) in 
+    let array_el = [ (Ll.Array (num_of_els, el_type), Ll.GArray (gdecls_list)) ] in
+    let arr_gdecl = (arr_type, Ll.GStruct (len_el @ array_el) ) in
+    (* let gdecls = List.map (fun (g, _) -> g) gdecls_list in *)
+    (arr_gdecl, [])
   | _ -> failwith "Error for other cases"
   end
 

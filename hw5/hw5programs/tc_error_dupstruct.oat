@@ -1,0 +1,11 @@
+struct L {
+  bool b
+}
+
+struct L {
+  int c
+}
+
+int program(int argc, string[] argv) {
+  return 0;
+}

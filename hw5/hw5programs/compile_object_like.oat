@@ -1,0 +1,15 @@
+struct Point {
+  int x;
+  int y;
+  ((Point) -> int) f
+}
+
+int sum(Point p) {
+  return p.x + p.y;
+}
+
+global p = Point {x=3; y=4; f=sum};
+
+int program (int argc, string[] argv) {
+  return p.f(p);
+}

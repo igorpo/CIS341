@@ -1,0 +1,59 @@
+global len = 4;
+
+int check(int[][] board, int i, int j, int count) {
+    if ((i >= 0) & (j >= 0) & (i < len) & (j < len)) {
+        return count + board[i][j];
+    } else {
+        return count;
+    }
+}
+
+int val_at(int[][] board, int i, int j) {
+    var alive = board[i][j];
+    var count = 0;
+    count = check(board, i-1, j-1, count);
+    count = check(board, i-1, j  , count);
+    count = check(board, i-1, j+1, count);
+
+    count = check(board, i  , j-1, count);
+    count = check(board, i  , j+1, count);
+
+    count = check(board, i+1, j-1, count);
+    count = check(board, i+1, j  , count);
+    count = check(board, i+1, j+1, count);
+
+    if (alive == 1) {
+        if (count < 2) {
+            return 0;
+        } else if (count < 4) {
+            return 1;
+        }
+        return 0;
+    }
+    if (count == 3) {
+        return 1;
+    } else {
+        return 0;
+    }
+    return 0;
+}
+
+int program (int argc, string[] argv) {
+    var board = new int[][]{ new int[]{0, 0, 0, 0},
+                             new int[]{0, 1, 1, 1},
+                             new int[]{1, 1, 1, 0},
+                             new int[]{0, 0, 0, 0} };
+    
+    var new_board = new int[][4];
+    for (var i=0; i < 4; i=i+1;) { 
+      new_board[i] = new int[4];
+      for (var j=0; j < 4; j=j+1;) { new_board[i][j] = val_at(board, i,j); }
+    }
+
+    for (var i = 0; i < len; i = i+1;) {
+        for (var j = 0; j < len; j = j+1;) {
+            print_int(new_board[i][j]);
+        }
+    }
+    return 0;
+}

@@ -1,0 +1,11 @@
+int id(int x) {
+  return x;
+}
+
+bool id (bool b) {
+  return b;
+}
+
+int program(int argc, string[] argv) {
+  return 0;
+}

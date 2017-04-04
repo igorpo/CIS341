@@ -1,0 +1,13 @@
+int program (int argc, string[] argv) {
+  var arr = array_of_string("1234967890");
+  var sum = 0;
+
+  for (var i=0; i<10; i=i+1;) {
+    arr[i] = i;
+  }
+  for (var i=0; i<10; i=i+1;) {
+    sum = sum + arr[i];
+  }
+  
+  return sum;
+}

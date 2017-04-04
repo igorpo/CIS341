@@ -1,0 +1,11 @@
+int program (int argc, string[] argv) {
+  var x = 0;
+  var i = 0;
+
+  while (i < 10) {
+    x = (x + i) * i;
+    i = i + 1;
+  }
+
+  return x;
+}

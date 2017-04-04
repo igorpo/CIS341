@@ -243,7 +243,11 @@ let old_student_tests = [
 
 let our_tests = [
   (* ("atprograms/run61.oat", "", "3410"); *)
-  ("atprograms/lib14.oat", "", "~}|{zyxwvu0");
+  (* ("atprograms/lib9.oat", "a b c d", "abcd5"); *)
+  (* ("atprograms/run21.oat", "", "99"); *)
+  (* ("atprograms/run8.oat", "", "2"); *)
+  (* ("atprograms/ss.oat", "", "2"); *)
+  ("atprograms/run1.oat", "", "153");
   (* ("atprograms/globals5.oat", "", "17"); *)
 ]
 
@@ -256,6 +260,7 @@ let tests : suite =
     GradedTest("easy tests", 15, executed_oat_file easy_tests);
     GradedTest("medium tests", 10, executed_oat_file medium_tests);
     GradedTest("hard tests", 10, executed_oat_file (hard_tests @ old_student_tests));
+    
     (* GradedTest("our tests", 99, executed_oat_file our_tests); *)
   ]
 

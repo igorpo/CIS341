@@ -1,0 +1,8 @@
+struct Pair {
+  int x;
+  int y
+}
+
+int program(int argc, string[] argv) {
+  return (new Pair {y = 3; x = 4}).y;
+}

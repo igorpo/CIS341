@@ -1,0 +1,7 @@
+int program (int argc, string[] argv) {
+  if(!true | -4 + 5 > 0 & 6 * 4 < 25) {
+    return 9;
+  } else {
+    return 4;
+  }
+}

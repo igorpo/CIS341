@@ -1,0 +1,65 @@
+int euclid_division (int numerator, int denominator) {
+	if (denominator < 0)
+	{
+		return -(euclid_division(numerator, -(denominator)));
+	}
+
+	var quotient = 0;
+	var remainder = numerator;
+
+	if (numerator < 0)
+	{
+		remainder = -(numerator);
+
+		while (remainder >= denominator)
+		{
+			quotient = quotient + 1;
+			remainder = remainder - denominator;
+		}
+
+		if ( remainder == 0 ) { return -(quotient); }
+		else {
+			return -(quotient) - 1;
+		}
+	}
+
+	while (remainder >= denominator)
+	{
+		quotient = quotient + 1;
+		remainder = remainder - denominator;
+	}
+	return quotient;
+}
+
+bool binary_search (int[] input, int key, int min, int max) {
+	if (max < min) {
+		return false;
+	}
+
+	var midpt = euclid_division((max + min), 2);
+
+	if (input[midpt] > key)
+	{
+		return binary_search(input, key, min, (midpt - 1));
+	}
+	if (input[midpt] < key)
+	{
+		return binary_search(input, key, (midpt + 1), max);
+	} else {
+		return true;
+	}
+}
+
+int program (int argc, string[] argv) {
+	var test_array = new int[100];
+        for (var i=0; i < 100; i=i+1;) { test_array[i] = 2 * i + 1; }
+	var even = binary_search (test_array, 80, 0, 99);
+	var odd = binary_search (test_array, 81, 0, 99);
+
+	if (!(even & odd) & (even | odd))
+	{
+		print_string("Correct!");
+	}
+
+	return 0;
+}

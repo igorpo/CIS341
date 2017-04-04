@@ -1,0 +1,19 @@
+int program (int argc, string[] argv) {
+  var x = new int[][]{new int[]{1},
+                      new int[]{2},
+                      new int[]{3},
+                      new int[]{4}};
+  var ans = 0;
+
+  for(var i=0;i<4;i=i+1;) {
+    ans = x[i][0] - ans;
+  }
+
+  if((5 [&] ~5 [|] 0) != 0) {
+    return ans;
+  } else {
+    return -ans;
+  }
+
+  return ans;
+}

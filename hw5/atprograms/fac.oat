@@ -1,0 +1,13 @@
+int f(int i) {
+  var r = 0;
+  if (i == 0) {
+    r = 1;
+  } else {
+    r = i * f (i-1);
+  }
+  return r; 
+}
+
+int program (int argc, string[] argv) {
+  return f (5);
+}

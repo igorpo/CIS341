@@ -1,0 +1,6 @@
+int program(int argc, string[] argv) {
+  if (3) {
+  } else {
+  }
+  return 0;
+}

@@ -1,0 +1,6 @@
+int program (int argc, string[] argv) {
+  var b = new bool[]{true, false};
+  var i = 0;
+  if (b[0]) { i = 1; }
+  return i;
+}

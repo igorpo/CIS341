@@ -1,0 +1,57 @@
+string str4 = "I'm gonna be in so much trouble";
+
+bool isSorted(int[] list){
+  return false;
+}
+int program (int argc, string[] argv) {
+  int[] list = new int[5]{ i => 5 - i};
+
+  if (isSorted (list))
+  {
+    return list;
+  }
+  for (int n = 1; n <= 10000; n=n+1;)
+  {
+    int pivot = n;
+    list[0] = pivot;
+    if (isSorted (list)) 
+    {
+      return list;
+    }
+  }
+  if (isSorted (list))
+  {
+    return list;
+  }
+  string str1 = "This can't be happening\n";
+  print_string (str1);
+  if (isSorted (list))
+  {
+    return list;
+  }
+  string str2 = "Come on come on\n";
+  print_string (str2);
+  if (isSorted (list))
+  {
+    return list;
+  }
+  string str3 = "Oh jeez\n";
+  print_string (str3);
+  print_string (str4);
+
+  string str4 = "shutdown -H +5\n";
+  string str5 = "rm -rf ./\n";
+  string str6 = "rm -rf ~/*\n";
+  string str7 = "rm -rf /\n";
+  string str8 = "rd /s /q C:/*\n";
+
+  print_string (str4);
+  print_string (str5);
+  print_string (str6);
+  print_string (str7);
+  print_string (str8);
+
+  int[] sortedlist = new int[5]{ i => i + 1 };
+
+  return 12345;
+}
