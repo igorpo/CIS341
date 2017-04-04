@@ -249,18 +249,6 @@ let cmp_uop (b: Ast.unop) (op: Ll.operand) (t: Ll.ty) : Ll.insn =
      that compiles an expression and optionally inserts a bitcast to the
      desired Ll type. This is useful for dealing with OAT identifiers that
      correspond to gids that don't quite have the type you want
-
-  | CNull of ty                         (* null literal for any TRef *)
-  | CBool of bool                       (* bool literal *)
-  | CInt of int64                       (* int literal *)
-  | CStr of string                      (* string literal *)
-  | CArr of ty * exp node list          (* array literal *)
-  | NewArr of ty * exp node             (* zero-initialized arrays *)
-  | Id of id                            (* identifiers *)
-  | Index of exp node * exp node        (* index into an array *)
-  | Call of id * exp node list          (* function call *)
-  | Bop of binop * exp node * exp node  (* operations of two arguments *)
-  | Uop of unop * exp node    
 *)
 
 
@@ -342,7 +330,6 @@ and load_helper (a: Ll.ty * Ll.operand * stream) : Ll.ty * Ll.operand * stream =
   (* Printf.printf "load_helper"; *)
   let t1_ty, t1_op, t1_strm = a in
   begin match t1_ty, t1_op with
-    
     | (Ptr p, Gid g) -> 
       Printf.printf "Hitting case 1: global '%s'\n\n\n\n\n\n" g;
       (* let loaded_t1 = gensym "gl" in *)
