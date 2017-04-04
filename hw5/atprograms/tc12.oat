@@ -1,0 +1,5 @@
+void f() {return;}
+void g() {
+  int i = f();
+  return;
+}

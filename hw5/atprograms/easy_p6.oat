@@ -1,0 +1,12 @@
+global y = 0;
+global z = 0;
+
+void f (int x, int y) {
+  var x = 0;
+  return;
+}
+
+void g (int x, int y) {
+  var z = 0;
+  return;
+}

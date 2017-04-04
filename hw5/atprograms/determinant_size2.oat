@@ -1,0 +1,35 @@
+int compute_determinant(int[][] matrix, int n) {
+  var sum = 0;
+  var multiplier = -1;
+  if (n == 1) {
+     sum = matrix[0][0];
+  }
+  else {
+    for (var k = 0; k < n; k = k+1;) {
+       var length = n-1;
+       var b=new int[][length];
+       for (var i=0; i < length; i=i+1;) {
+         b[i] = new int[length];
+         for (var j=0; j < length; j=j+1;) { b[i][j] = 1; }
+       }
+       for (var l = 0; l < k; l=l+1;) {
+          for (var m = 0; m < n-1; m=m+1;) {
+            b[m][l] = matrix[m+1][l];
+          }
+       }
+       for (var o = k; o < n-1; o=o+1;) {
+          for (var p = 0; p < n-1; p=p+1;) {
+            b[p][o] = matrix[p+1][o+1];
+          }       
+       }
+       multiplier = multiplier * -1;
+       sum = sum + multiplier * matrix[0][k] * compute_determinant(b, n-1);
+    }
+  }
+  return sum;
+}
+
+int program (int argc, string[] argv) {
+  var matrix = new int[][]{new int[]{20,2},new int[]{3,5}};
+  return compute_determinant(matrix, 2); 
+}

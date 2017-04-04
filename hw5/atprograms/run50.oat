@@ -1,0 +1,4 @@
+int program (int argc, string[] argv) {
+  print_string ("abcde");
+  return 0;
+}

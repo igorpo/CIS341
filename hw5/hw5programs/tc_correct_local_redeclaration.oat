@@ -1,0 +1,6 @@
+global x = 2;
+
+int program(int argc, string[] argv) {
+  var x = 2;
+  return x;
+}

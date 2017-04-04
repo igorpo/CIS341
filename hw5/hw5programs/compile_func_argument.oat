@@ -1,0 +1,9 @@
+int call((int) -> int f, int arg) {
+  return f(arg);
+}
+
+int inc(int x) { return x + 1; }
+
+int program(int argc, string[] argv) {
+  return call(inc, 3);
+}

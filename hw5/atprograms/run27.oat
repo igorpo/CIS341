@@ -1,0 +1,4 @@
+int program (int argc, string[] argv) {
+  var i=99;
+  return i;
+}

@@ -1,0 +1,12 @@
+int add(int arg1, int arg2) {
+  return arg1 + arg2;
+}
+
+int mul(int arg1, int arg2) {
+  return arg1 * arg2;
+}
+
+int program(int argc, string[] argv) {
+  var add = mul;
+  return add(3, 4);
+}

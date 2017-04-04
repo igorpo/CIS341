@@ -1,0 +1,6 @@
+int program (int argc, string[] argv) {
+  var strs = new string[][]{new string[]{"abc", "def"}, 
+                            new string[]{"789", "123"}};
+  print_string (strs[1][1]);
+  return 0;
+}

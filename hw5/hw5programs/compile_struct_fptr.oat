@@ -1,0 +1,12 @@
+struct S {
+  int s;
+  int t;
+  (int, int) -> int f
+}
+
+int add(int x, int y) { return x + y; }
+
+int program(int argc, string[] argv) {
+  var x = new S { s = 3; t = 4; f = add };
+  return x.f(x.s, x.t);
+}

@@ -1,0 +1,19 @@
+int f(int[] a) {
+  return a[1];
+}
+
+int g(int x) {
+  var arr = new int[3];
+  for (var i = 0; i < 3; i=i+1;) { arr[i] = x; }     
+  return arr[1];
+}
+
+int program (int argc, string[] argv) {
+  var a = new int[3];
+  for (var i=0; i < 3; i=i+1;) { a[i] = i; }
+  var arr = new int[4];
+  for (var i=0; i < 4; i=i+1;) { arr[i] = i*i; }
+  var arr0 = new int[3];
+  for (var i=0; i < 3; i=i+1;) { arr0[i] = 2*i; }
+  return arr[3] + a[1] + f(arr0) + g(4); 
+}

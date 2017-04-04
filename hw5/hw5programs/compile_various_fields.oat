@@ -1,0 +1,20 @@
+struct Test {
+  int i;
+  bool b;
+  string s;
+  int[] arr;
+  Test t;
+  (int) -> int f
+}
+
+int neg(int x) { return -x; }
+
+int program(int argc, string[] argv) {
+  var n = new Test {i=3; b=true; s="hello"; arr=new int[3]; t=Test null; f=neg};
+  print_string(n.s);
+  if(n.b) {
+    return n.f(n.i);
+  } else {
+    return n.i;
+  }
+} 

@@ -1,0 +1,5 @@
+bool f(int a) {
+  int b=true;
+  if (a) { b=true; } else { b=false; }
+  return b;  
+}

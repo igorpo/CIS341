@@ -1,0 +1,18 @@
+global i=0;
+
+int f(int x, int y) {
+  var r = 0;
+  if (x >= 1) {
+    r = 1 + f (x-1, y);
+  } else {
+    r = x + y;
+  }
+  return r;
+}
+
+int program (int argc, string[] argv) {
+  var x = 3;
+  var y = 3;
+  
+  return f(x, y)+i;
+}

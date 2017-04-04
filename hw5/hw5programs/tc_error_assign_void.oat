@@ -1,0 +1,4 @@
+int program(int argc, string[] argv) {
+  var x = print_int(3);
+  return 0;
+}

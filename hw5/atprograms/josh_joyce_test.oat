@@ -1,0 +1,20 @@
+global arr1 = int[]{1,2,3,4};
+global arr2 = int[]{1,2,3,5};
+
+int arrcheck(int[] ar1, int[] ar2, int len){
+	var val = 0;
+	for(var i =0; i < len; i= i+1;){
+		if (ar1[i] != ar2[i]) {
+			val = 1;
+		}
+	}
+	return val;
+}
+
+int program(int argc, string[] argv) {
+
+    var val = 1;
+    if(arrcheck(arr1, arr2, 4) == 1) {val = 0;}
+    return val;
+
+}

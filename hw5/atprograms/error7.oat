@@ -1,0 +1,3 @@
+int f = 0;
+
+void f() {return;}

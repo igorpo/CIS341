@@ -1,0 +1,6 @@
+int[][] arr=null;
+
+int program (int argc, string[] argv) {
+  arr = {{1,2}, {3,4}};
+  return arr[3][0];
+}

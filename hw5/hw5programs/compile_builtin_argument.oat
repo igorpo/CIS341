@@ -1,0 +1,10 @@
+void run2((string) -> void f, string arg) {
+  f(arg);
+  f(arg);
+  return;
+}
+
+int program(int argc, string[] argv) {
+  run2(print_string, "ab");
+  return 0;
+}

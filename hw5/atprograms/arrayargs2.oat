@@ -1,0 +1,14 @@
+int[] f(int[] x, int[] y, bool b) {
+  if ( b ) {
+    return x;
+  } else {
+    return y;
+  }
+}
+
+int program (int argc, string[] argv) {
+  var x = new int[3];
+  var y = new int[3];
+  f(x, y, true)[0] = 17;
+  return x[0];
+}

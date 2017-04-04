@@ -1,0 +1,11 @@
+string sub (string str, int start, int len) {
+  var arr = array_of_string(str);
+  var r = new int[len];
+  for (var i=0; i < len; i=i+1;) { r[i] = arr[i+start]; }
+  return string_of_array (r);
+}
+
+int program (int argc, string []  argv) {
+  print_string (sub(argv[1], 3, 5));
+  return 0;
+}

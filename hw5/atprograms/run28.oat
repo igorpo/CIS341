@@ -1,0 +1,5 @@
+int program (int argc, string[] argv) {
+  var i=9;
+  var j=i+i;
+  return i+i*i-j>>2<<2>>>2;
+}

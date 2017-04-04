@@ -1,0 +1,5 @@
+global arr = int[]{1, 2, 3, 4};
+
+int program(int argc, string[] args) {
+  return 5;
+}

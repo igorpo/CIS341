@@ -1,0 +1,10 @@
+struct Color {
+  int red;
+  int green;
+  int blue
+}
+
+int program (int argc, string[] argv) {
+  var garr = new Color { red = 3; green = 4; blue = 5 }; 
+  return garr.red + garr.green;
+}

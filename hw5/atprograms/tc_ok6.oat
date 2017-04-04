@@ -1,0 +1,30 @@
+int f() {
+  int i1 = 3 + 4;
+  int i2 = 3 * 4;
+  int i3 = 3 - 4;
+
+  bool b1 = 3 == 4;
+  bool b2 = 3 != 4;
+  bool b3 = true == false;
+  bool b4 = true != false;
+  bool b5 = "abc" == "def";
+  bool b6 = 3 < 4;
+  bool b7 = 3 <= 4;
+  bool b8 = 3 > 4;
+  bool b9 = 3 >= 4;
+
+  int i4 = 3 [&] 4;
+  bool b10 = true & false;
+
+  int i5 = 3 [|] 4;
+  bool b11 = true | false;
+
+  int i6 = 3 << 4;
+  int i7 = 3 >> 4;
+  int i8 = 3 >>> 4;
+
+  int i9 = - 3;
+  int i10 = ~ 4;
+  bool b12 = !false;
+  return 0;
+}

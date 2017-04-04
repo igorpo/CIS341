@@ -1,0 +1,9 @@
+int[] f (int[] arr) {
+  return arr;
+} 
+
+int program (int argc, string[] argv) {
+  var garr = new int[][] {new int[]{1, 2, 3}, new int[]{4, 5, 6}};
+  var arr = f(garr[1]);
+  return arr[1];
+}

@@ -1,0 +1,38 @@
+int[] insert(int[] partial, int length, int insertee) {
+  var inserted = new int[length+1];
+  for (var i=0; i < length+1; i=i+1;) { inserted[i] = -1; }
+  var not_yet_inserted = true;
+  if (insertee < partial[0]) {
+    not_yet_inserted = false;
+    inserted[0] = insertee;
+  }
+  for (var i = 0; i < length; i = i + 1;) {
+    if (not_yet_inserted) {
+      if (insertee > partial[i]) { 
+        not_yet_inserted = false;
+        inserted[i+1] = insertee;
+        inserted[i] = partial[i];
+      } else {
+        inserted[i] = partial[i];
+      }
+    } else {
+      inserted[i+1] = partial[i];
+    }
+  }
+  return inserted;
+}
+
+int[] insort(int[] unsorted, int len) {
+  var out = new int[1];
+  out[0] = unsorted[0];
+  for (var i = 1; i < len; i = i + 1;) {
+    out = insert(out, i, unsorted[i]);
+  }
+  return out;
+}
+
+int program(int argc, string[] argv) {
+  var array = new int[]{13, 42, 32, 3, 2, 6};
+  var result = insort(array, 6);
+  return result[5];
+}

@@ -1,0 +1,28 @@
+global i = 1;
+
+int f(int[] arr) {
+  return arr[3];
+}
+
+int[] g() {
+  var arr = new int[] {99, 1, 99, 99};
+  return arr;
+}
+
+int program (int argc, string[] argv) {
+  var arr1 = new int[] {99, 1, 99};
+  var arr2 = new int[][] {new int[]{99,99,99}, 
+                          new int[]{99,1,99}, 
+                          new int[]{99,99,99}};
+
+  var c = 1;
+  var arr4 = g();
+  var arr3 = new int[] {99, 99, 99, 1};
+  c = c + i;
+  c = c + arr1[1];
+  c = c + arr2[1][1];
+  c = c + arr3[3];
+  c = c + f(arr3);
+  c = c + arr4[1];
+  return c;
+}

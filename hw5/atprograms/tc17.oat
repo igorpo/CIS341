@@ -1,0 +1,4 @@
+void f() {
+  int x = length_of_array(3);
+  return;
+}

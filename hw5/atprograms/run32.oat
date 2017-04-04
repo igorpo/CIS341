@@ -1,0 +1,12 @@
+global i=11;
+int f () {
+  var i=12;
+  return i;
+}
+int g() {
+  var i=10;
+  return i;
+}
+int program (int argc, string[] argv) {
+  return f() + g() + i;
+}

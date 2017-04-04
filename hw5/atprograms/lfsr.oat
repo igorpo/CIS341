@@ -1,0 +1,44 @@
+global lfsr_iterations  = 5;
+global lfsr_length      = 4;
+global lfsr_init_values = bool[]{true, false, true, false};
+
+bool xor(bool x, bool y) {
+  return (x & !y) | (!x & y);
+}
+
+string string_of_bool(bool b) {
+    if (b) { return "T"; }
+    else   { return "F"; }
+}
+
+void print_lfsr(bool[] lfsr_register, int length) {
+    for (var i = 0; i < length; i = i + 1;) {
+        print_string(string_of_bool(lfsr_register[i]));
+    }
+    return;
+}
+
+int program(int argc, string[] argv) {
+    /* Initialize the working register */
+    var lfsr_register = new bool[lfsr_length];
+    for (var i=0; i < lfsr_length; i=i+1;) {
+      lfsr_register[i] = lfsr_init_values[i]; 
+    }
+
+    /* Do the computations */
+    for (var i = 0; i < lfsr_iterations; i = i + 1;) {
+        var new_first =
+            xor(lfsr_register[lfsr_length - 1], lfsr_register[lfsr_length - 2]);
+        for (var j = lfsr_length - 1; j > 0; j = j - 1;) {
+            lfsr_register[j] = lfsr_register[j - 1];
+        }
+        lfsr_register[0] = new_first;
+    }
+
+    /* Print the initial and final bool arrays with a space separator */
+    print_lfsr(lfsr_init_values, lfsr_length);
+    print_string(" ");
+    print_lfsr(lfsr_register, lfsr_length);
+
+    return 0;
+}

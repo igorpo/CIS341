@@ -1,0 +1,8 @@
+global y = true;
+
+int program(int argc, string[] args) {
+  if (y) {
+    return 17;
+  } 
+  return 15;
+}
