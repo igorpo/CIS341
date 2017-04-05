@@ -93,8 +93,8 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
       begin match struct_opt with
       | Some field_list -> 
         let sorted_field_list = List.sort flist_compare field_list in
-        if (compare_cflist_flist sorted_cf_list field_list) then Ast.TRef (Ast.RStruct id)
-        else let err = type_error e "Struct " ^ id ^ " fields do not match" in Ast.TBool
+        if (compare_cflist_flist sorted_cf_list sorted_field_list) then Ast.TRef (Ast.RStruct id)
+        else let _ = type_error e "Struct " ^ id ^ " fields do not match" in Ast.TBool
       | None -> 
         let err = type_error e "Unknown struct type " ^ id in Ast.TBool
       end
@@ -148,6 +148,7 @@ let rec typecheck_ty (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.ty) : unit =
   | Ast.TBool -> ()
   | Ast.TInt -> ()
   | TRef rty -> typecheck_ref l tc rty
+  | _ -> type_error l "Type not allowed"
   end
 
 and typecheck_ref (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.rty) : unit =
@@ -216,6 +217,12 @@ let rec check_fdecl_redeclare c fname =
   | None -> false
   end
 
+let rec check_global_id_mention c gname =
+  begin match Tctxt.lookup_global_option gname c with 
+  | Some _ -> true
+  | None -> false
+  end
+
 let create_struct_ctxt p =
   let c = Tctxt.empty in 
   List.fold_left (fun ctxt el ->
@@ -236,14 +243,39 @@ let create_function_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
     match el with
     | Gfdecl ({elt=f}) -> 
       if check_fdecl_redeclare ctxt f.name then 
+        ctxt
+      else 
         let arg_types = List.map (fun (t,i) -> t) f.args in
         Tctxt.add_function ctxt f.name (arg_types,f.rtyp)
-      else 
-        ctxt
     | _ -> ctxt) builtins_context p
 
 let create_global_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
-  Tctxt.empty
+  List.fold_left (fun ctxt el ->
+    match el with
+    | Gvdecl gdec -> 
+      let name = gdec.elt.name in
+      let init = gdec.elt.init in
+      begin match init.elt with
+      | Id i -> 
+          if check_global_id_mention ctxt name then
+            begin match Tctxt.lookup_function_option i ctxt with
+            | Some (_,ret_ty) -> 
+              begin match ret_ty with
+              | RetVal ret_ty_ty -> Tctxt.add_global ctxt name ret_ty_ty
+              | RetVoid -> type_error gdec "Void function not allowed"
+              end
+            | None -> type_error gdec "Reference to nonexistent function name"
+            end
+          else ctxt
+      | CNull t -> Tctxt.add_global ctxt name t
+      | CBool _ -> Tctxt.add_global ctxt name Ast.TBool
+      | CInt _ -> Tctxt.add_global ctxt name Ast.TInt
+      | CStr _ -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RString))
+      | CArr (t, _) -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RArray t))
+      | CStruct (id, _) -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RStruct id))
+      | _ -> type_error gdec "Type not allowed in global declaration"
+      end
+    | _ -> ctxt) tc p
 
 (* typechecks the whole program in the correct global context --------------- *)
 (* This function implements the TYP_PROG rule of the oat.pdf specification.
