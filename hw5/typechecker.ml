@@ -63,8 +63,49 @@ let typ_of_unop : Ast.unop -> Ast.ty * Ast.ty = function
        This is the meaning of the permutation pi that is used in the 
        TYP_STRUCTLIT rule.
 *)
+
+
+let cflist_compare x y =
+  if x.cfname < y.cfname then -1
+  else if x.cfname > y.cfname then 1
+  else 0
+
+let flist_compare x y =
+  if x.fname < y.fname then -1
+  else if x.fname > y.fname then 1
+  else 0
+
+let compare_cflist_flist x y =
+  true
+
 let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
-failwith "typecheck_exp not implemented"
+  begin match e.elt with
+    | Ast.CNull ty -> ty
+    | Ast.CBool bool_ -> Ast.TBool
+    | Ast.CInt int64_ -> Ast.TInt
+    | Ast.CStr string_ -> Ast.TRef (Ast.RString)
+    | Ast.CArr (ty, exp_node_list) -> 
+      if List.for_all (fun x -> (typecheck_exp c x) = ty) exp_node_list then ty 
+      else type_error e "Array type mismatch"
+    | Ast.CStruct (id, cfield_list) -> 
+      let sorted_cf_list = List.sort cflist_compare cfield_list in
+      let struct_opt = Tctxt.lookup_struct_option id c in
+      begin match struct_opt with
+      | Some field_list -> 
+        let sorted_field_list = List.sort flist_compare field_list in
+        if (compare_cflist_flist sorted_cf_list field_list) then Ast.TRef (Ast.RStruct id)
+        else let err = type_error e "Struct " ^ id ^ " fields do not match" in Ast.TBool
+      | None -> 
+        let err = type_error e "Unknown struct type " ^ id in Ast.TBool
+      end
+    | Ast.Proj (exp_node, id) -> Ast.TBool
+    | Ast.NewArr (ty, exp_node) -> Ast.TBool
+    | Ast.Id id -> Ast.TBool
+    | Ast.Index (exp_node1, exp_node2) -> Ast.TBool
+    | Ast.Call (exp_node, exp_node_list) -> Ast.TBool
+    | Ast.Bop (binop_, exp_node1, exp_node2) -> Ast.TBool
+    | Ast.Uop (unop_, exp_node) -> Ast.TBool
+  end
 
 
 (* statements --------------------------------------------------------------- *)
@@ -102,14 +143,6 @@ failwith "typecheck_stmt not implemented"
     - tc contains the structure definition context
 *)
 
-(* fs = [(x,bool), (y,bool)] *)
-
-
-(* 
-
-  l = ("Pair", [(x,bool), (y,bool)])
-
- *)
 let rec typecheck_ty (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.ty) : unit =
   begin match t with
   | Ast.TBool -> ()
@@ -124,7 +157,7 @@ and typecheck_ref (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.rty) : unit =
     let typ_opt = Tctxt.lookup_global_option id tc in
     begin match typ_opt with
       | Some typ -> typecheck_ty l tc typ
-      | None -> raise (TypeError (id ^ " not in context"(*  ^ l.loc *)))
+      | None -> type_error l "not in context"
     end
   | Ast.RArray ty -> typecheck_ty l tc ty
   | Ast.RFun fty -> typecheck_fty l tc fty
@@ -138,30 +171,6 @@ and typecheck_fty (l : 'a Ast.node) (tc : Tctxt.t) (t:Ast.fty) : unit =
   | Ast.RetVal ret_val_ty -> typecheck_ty l tc ret_val_ty
   end
 
-and tc_bool (l : 'a Ast.node) (tc : Tctxt.t) : unit =
-  let id, fs = l.elt in
-  Printf.printf "ID is %s\n" id;
-  ()
-  (* begin match l.elt with
-  | Ast.CBool b -> ()
-  | Ast.Id id -> 
-    begin match (Tctxt.lookup id tc) with
-    | Ast.TBool -> ()
-    | _ -> raise (TypeError (id ^ " is not bool"))
-    end
-  | _ -> failwith "not exp"
-  end *)
-
-(* and rec tc_int (l : 'a Ast.node) (tc : Tctxt.t) : unit =
-  begin match l with
-  
-  end *)
-
-(* 
-  loc.elt = (id, fs)
-  fs = [field]
- *)
-
 
 let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
   List.iter (fun f -> typecheck_ty loc tc f.ftyp) l
@@ -174,7 +183,7 @@ let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
     - checks that the function actually returns
 *)
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
-failwith "typecheck_fdecl unimplemented"
+  failwith "typecheck_fdecl unimplemented"
 
 
 (* creating the typchecking context ----------------------------------------- *)
