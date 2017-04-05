@@ -183,7 +183,7 @@ let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
     - checks that the function actually returns
 *)
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
-  failwith "typecheck_fdecl unimplemented"
+  ()
 
 
 (* creating the typchecking context ----------------------------------------- *)
@@ -210,16 +210,37 @@ let rec check_dups fs =
   | [] -> false
   | h :: t -> if List.exists (fun x -> x.fname = h.fname) t then true else check_dups t
 
+let rec check_fdecl_redeclare c fname =
+  begin match Tctxt.lookup_function_option fname c with 
+  | Some _ -> true
+  | None -> false
+  end
+
 let create_struct_ctxt p =
-Tctxt.empty
+  let c = Tctxt.empty in 
+  List.fold_left (fun ctxt el ->
+    match el with
+    | Gtdecl ({elt=(id, fs)}) -> 
+      if check_dups fs then 
+        ctxt
+      else 
+        Tctxt.add_struct ctxt id fs 
+    | _ -> ctxt) c p
 
 
 let create_function_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
   let builtins_context = 
     List.fold_left (fun c (id, t) -> Tctxt.add_function c id t) tc builtins
   in
-(* failwith "create_function_ctxt undefined" *)
-Tctxt.empty
+  List.fold_left (fun ctxt el ->
+    match el with
+    | Gfdecl ({elt=f}) -> 
+      if check_fdecl_redeclare ctxt f.name then 
+        let arg_types = List.map (fun (t,i) -> t) f.args in
+        Tctxt.add_function ctxt f.name (arg_types,f.rtyp)
+      else 
+        ctxt
+    | _ -> ctxt) builtins_context p
 
 let create_global_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
   Tctxt.empty
