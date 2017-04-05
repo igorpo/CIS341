@@ -36,7 +36,7 @@ let typ_of_unop : Ast.unop -> Ast.ty * Ast.ty = function
 
    Typechecks an expression in the typing context c, returns the type of the 
    expression.  This function should implement the inference rules given in
-   the oad.pdf specification.  There, they are written:
+   the oat.pdf specification.  There, they are written:
 
        F; S; G; L |- exp : t
 
@@ -97,12 +97,71 @@ failwith "typecheck_stmt not implemented"
 (* TASK: Implement a (set of) functions that check that types are well formed.
 
     - l is just an ast node that provides source location information for
-      generating error messages (it's only needed for type_error
+      generating error messages (it's only needed for type_error)
 
     - tc contains the structure definition context
+*)
+
+(* fs = [(x,bool), (y,bool)] *)
+
+
+(* 
+
+  l = ("Pair", [(x,bool), (y,bool)])
+
  *)
 let rec typecheck_ty (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.ty) : unit =
-failwith "typecheck_ty not implemented"
+  begin match t with
+  | Ast.TBool -> ()
+  | Ast.TInt -> ()
+  | TRef rty -> typecheck_ref l tc rty
+  end
+
+and typecheck_ref (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.rty) : unit =
+  begin match t with
+  | Ast.RString -> ()
+  | Ast.RStruct id -> 
+    let typ_opt = Tctxt.lookup_global_option id tc in
+    begin match typ_opt with
+      | Some typ -> typecheck_ty l tc typ
+      | None -> raise (TypeError (id ^ " not in context"(*  ^ l.loc *)))
+    end
+  | Ast.RArray ty -> typecheck_ty l tc ty
+  | Ast.RFun fty -> typecheck_fty l tc fty
+  end
+
+and typecheck_fty (l : 'a Ast.node) (tc : Tctxt.t) (t:Ast.fty) : unit =
+  let args_types, ret_typ = t in
+  let _ = List.iter (fun arg -> typecheck_ty l tc arg) args_types in
+  begin match ret_typ with
+  | Ast.RetVoid -> ()
+  | Ast.RetVal ret_val_ty -> typecheck_ty l tc ret_val_ty
+  end
+
+and tc_bool (l : 'a Ast.node) (tc : Tctxt.t) : unit =
+  let id, fs = l.elt in
+  Printf.printf "ID is %s\n" id;
+  ()
+  (* begin match l.elt with
+  | Ast.CBool b -> ()
+  | Ast.Id id -> 
+    begin match (Tctxt.lookup id tc) with
+    | Ast.TBool -> ()
+    | _ -> raise (TypeError (id ^ " is not bool"))
+    end
+  | _ -> failwith "not exp"
+  end *)
+
+(* and rec tc_int (l : 'a Ast.node) (tc : Tctxt.t) : unit =
+  begin match l with
+  
+  end *)
+
+(* 
+  loc.elt = (id, fs)
+  fs = [field]
+ *)
+
 
 let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
   List.iter (fun f -> typecheck_ty loc tc f.ftyp) l
@@ -143,17 +202,18 @@ let rec check_dups fs =
   | h :: t -> if List.exists (fun x -> x.fname = h.fname) t then true else check_dups t
 
 let create_struct_ctxt p =
-failwith "create_struct_ctxt not implemented"
+Tctxt.empty
 
 
 let create_function_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
   let builtins_context = 
     List.fold_left (fun c (id, t) -> Tctxt.add_function c id t) tc builtins
   in
-failwith "create_function_ctxt undefined"
+(* failwith "create_function_ctxt undefined" *)
+Tctxt.empty
 
 let create_global_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
-failwith "create_global_ctxt undefined"
+  Tctxt.empty
 
 (* typechecks the whole program in the correct global context --------------- *)
 (* This function implements the TYP_PROG rule of the oat.pdf specification.
