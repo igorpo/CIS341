@@ -94,17 +94,46 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
       | Some field_list -> 
         let sorted_field_list = List.sort flist_compare field_list in
         if (compare_cflist_flist sorted_cf_list sorted_field_list) then Ast.TRef (Ast.RStruct id)
-        else let _ = type_error e "Struct " ^ id ^ " fields do not match" in Ast.TBool
-      | None -> 
-        let err = type_error e "Unknown struct type " ^ id in Ast.TBool
+        else 
+          let err_msg = "Struct " ^ id ^ " fields do not match" in
+          type_error e err_msg
+      | None -> let err_msg = "Unknown struct type " ^ id in
+          type_error e err_msg
       end
     | Ast.Proj (exp_node, id) -> Ast.TBool
     | Ast.NewArr (ty, exp_node) -> Ast.TBool
     | Ast.Id id -> Ast.TBool
     | Ast.Index (exp_node1, exp_node2) -> Ast.TBool
     | Ast.Call (exp_node, exp_node_list) -> Ast.TBool
-    | Ast.Bop (binop_, exp_node1, exp_node2) -> Ast.TBool
-    | Ast.Uop (unop_, exp_node) -> Ast.TBool
+    | Ast.Bop (binop_, exp_node1, exp_node2) -> 
+      Printf.printf "Bop!\n";
+      let (t1,t2,t) = typ_of_binop binop_ in
+      let tc_t1 = typecheck_exp c exp_node1 in
+      let tc_t2 = typecheck_exp c exp_node2 in
+      if tc_t1 = t1 && tc_t2 = t2 then
+        t
+      else
+        type_error e "Incompatible binop operand types"
+    | Ast.Uop (unop_, exp_node) -> 
+      let (t1,t) = typ_of_unop unop_ in
+      let tc_t1 = typecheck_exp c exp_node in
+      if tc_t1 = t then
+        t
+      else
+        type_error e "Incompatible unop operand types"
+
+
+
+(* (* binary operation types --------------------------------------------------- *)
+let typ_of_binop : Ast.binop -> Ast.ty * Ast.ty * Ast.ty = function
+  | Add | Mul | Sub | Shl | Shr | Sar | IAnd | IOr -> (TInt, TInt, TInt)
+  | Eq | Neq | Lt | Lte | Gt | Gte -> (TInt, TInt, TBool)
+  | And | Or -> (TBool, TBool, TBool)
+
+(* unary operation types ---------------------------------------------------- *)
+let typ_of_unop : Ast.unop -> Ast.ty * Ast.ty = function
+  | Neg | Bitnot -> (TInt, TInt)
+  | Lognot       -> (TBool, TBool) *)
   end
 
 
@@ -164,13 +193,16 @@ and typecheck_ref (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.rty) : unit =
   | Ast.RFun fty -> typecheck_fty l tc fty
   end
 
-and typecheck_fty (l : 'a Ast.node) (tc : Tctxt.t) (t:Ast.fty) : unit =
-  let args_types, ret_typ = t in
-  let _ = List.iter (fun arg -> typecheck_ty l tc arg) args_types in
-  begin match ret_typ with
+and typecheck_ret_ty rt l tc =
+  begin match rt with
   | Ast.RetVoid -> ()
   | Ast.RetVal ret_val_ty -> typecheck_ty l tc ret_val_ty
   end
+
+and typecheck_fty (l : 'a Ast.node) (tc : Tctxt.t) (t:Ast.fty) : unit =
+  let args_types, ret_typ = t in
+  let _ = List.iter (fun arg -> typecheck_ty l tc arg) args_types in
+  typecheck_ret_ty ret_typ l tc
 
 
 let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
@@ -183,8 +215,38 @@ let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
     - typechecks the body of the function (passing in the expected return type
     - checks that the function actually returns
 *)
+
+let typecheck_block (tc : Tctxt.t) (f : Ast.block) (l : 'a Ast.node)  =
+  failwith ""
+
+(* type fdecl =
+  { rtyp : ret_ty
+  ; name : id
+  ; args : (ty * id) list
+  ; body : block        
+  } 
+
+  
+  args = (ty * id) list
+  
+
+*)
+
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
-  ()
+  let rtyp = f.rtyp in
+  let name = f.name in
+  let args = f.args in
+  let body = f.body in
+  let _ = typecheck_ret_ty rtyp l tc in
+  let new_tc = List.fold_left (fun c (t, i) -> Tctxt.add_local c i t) tc args
+  (* 
+
+    TODO: FINISH
+
+   *)
+  in ()
+
+
 
 
 (* creating the typchecking context ----------------------------------------- *)

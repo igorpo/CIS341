@@ -277,15 +277,16 @@ let fptr_tests = [
 ]
 
 let our_test = [
-    ("hw5programs/rs.oat", "", "0");
+    ("hw5programs/tc_error_binop1.oat", "", "0");
   ]
 
 let hw5_tests : suite =
-  [ GradedTest("struct tests", 20, executed_oat_file struct_tests);
-    GradedTest("fptr tests", 15, executed_oat_file fptr_tests);   
+  [ 
+    (* GradedTest("struct tests", 20, executed_oat_file struct_tests);
+    GradedTest("fptr tests", 15, executed_oat_file fptr_tests);    *)
 
 
-    (* GradedTest("our_test tests", 20, executed_oat_file our_test); *)
+    GradedTest("our_test tests", 20, executed_oat_file our_test);
   ]
 
 
@@ -301,5 +302,5 @@ let manual_tests : suite = [
   );
 ]
 
-let graded_tests : suite = hw4_tests @ hw5_tests @ typecheck_tests @ manual_tests 
-(* let graded_tests : suite = hw5_tests *)
+(* let graded_tests : suite = hw4_tests @ hw5_tests @ typecheck_tests @ manual_tests  *)
+let graded_tests : suite = hw5_tests
