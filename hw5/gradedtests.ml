@@ -277,7 +277,7 @@ let fptr_tests = [
 ]
 
 let our_test = [
-    ("hw5programs/tc_error_struct.oat", "", "0");
+    ("hw5programs/compile_nested_struct.oat", "", "0");
   ]
 
 let hw5_tests : suite =

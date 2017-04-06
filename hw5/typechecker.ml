@@ -75,8 +75,9 @@ let flist_compare x y =
   else if x.fname > y.fname then 1
   else 0
 
-let compare_cflist_flist x y =
-  true
+let compare_cflist_flist cf_list field_list =
+  if (List.length cf_list) <> (List.length field_list) then false else
+  List.for_all2 (fun x y -> x.cfname = y.fname) cf_list field_list
 
 let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
   begin match e.elt with
@@ -187,13 +188,39 @@ type stmt_type = NoReturn | Return
 *)
 let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.t * stmt_type =
   begin match s.elt with 
-  | Ast.Assn (e1, e2) -> (tc, NoReturn)    
+  | Ast.Assn (lhs, rhs) -> 
+    let t1 = typecheck_exp tc lhs in
+    let t2 = typecheck_exp tc rhs in
+    if t1 <> t2 then
+      type_error s "Assignment illegal, types do not match"
+    else
+      let new_c = begin match lhs.elt with
+      | Ast.Id id -> Tctxt.add_local tc id t1
+      | Ast.Index (e1,e2) -> tc
+      | Ast.Proj (e, id) -> tc
+      | _ -> type_error s "Illegal lhs of assignment"
+      end in
+    (new_c, NoReturn)    
   | Ast.Decl vd -> 
     let id, exp_node = vd in
     let exp_ty = typecheck_exp tc exp_node in
     let new_c = Tctxt.add_local tc id exp_ty in
      (new_c, NoReturn)
-  | Ast.Ret e_opt -> (tc, NoReturn)              
+  | Ast.Ret e_opt -> 
+    begin match e_opt with
+    | Some s -> 
+      (*
+      
+        TODO: we were here
+      
+      *)
+
+      (* let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
+      let t = typecheck_exp tc s in *)
+      (tc, Return)
+    | None -> 
+      (tc, Return)
+    end
   | Ast.SCall (e, e_lst) -> (tc, NoReturn) 
   | Ast.For (vd_lst, e_opt, stmt_opt, blk) -> (tc, NoReturn) 
   | Ast.While (e_n, blk) -> (tc, NoReturn) 
@@ -221,9 +248,10 @@ and typecheck_ref (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.rty) : unit =
   begin match t with
   | Ast.RString -> ()
   | Ast.RStruct id -> 
-    let typ_opt = Tctxt.lookup_global_option id tc in
+    let typ_opt = Tctxt.lookup_struct_option id tc in
     begin match typ_opt with
-      | Some typ -> typecheck_ty l tc typ
+      | Some field_list -> 
+        List.iter (fun f -> typecheck_ty l tc f.ftyp) field_list
       | None -> type_error l "not in context"
     end
   | Ast.RArray ty -> typecheck_ty l tc ty
@@ -264,18 +292,6 @@ let typecheck_block (tc : Tctxt.t) (body : Ast.block) (l : 'a Ast.node) rtyp =
     new_c
   ) tc body in ()
 
-(* type fdecl =
-  { rtyp : ret_ty
-  ; name : id
-  ; args : (ty * id) list
-  ; body : block        
-  } 
-
-  
-  args = (ty * id) list
-  
-  block = stmt node list
-*)
 
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let rtyp = f.rtyp in
