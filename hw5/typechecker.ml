@@ -100,11 +100,50 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
       | None -> let err_msg = "Unknown struct type " ^ id in
           type_error e err_msg
       end
-    | Ast.Proj (exp_node, id) -> Ast.TBool
-    | Ast.NewArr (ty, exp_node) -> Ast.TBool
-    | Ast.Id id -> Ast.TBool
-    | Ast.Index (exp_node1, exp_node2) -> Ast.TBool
-    | Ast.Call (exp_node, exp_node_list) -> Ast.TBool
+    | Ast.Proj (exp_node, x) -> 
+      let t = typecheck_exp c exp_node in
+      begin match t with
+      | Ast.TRef (Ast.RStruct (st_name)) -> 
+          begin match Tctxt.lookup_field_option st_name x c with
+          | Some s -> s
+          | None -> let err_msg = x ^ " not a field in struct " ^ st_name in
+          type_error e err_msg
+          end
+      | _ -> let err_msg = "Not a struct. Cannot project" in
+          type_error e err_msg
+      end
+    | Ast.NewArr (ty, exp_node) -> 
+      begin match typecheck_exp c exp_node with
+      | Ast.TInt -> ty
+      | _ -> let err_msg = "NewArr size expression must evaluate to an integer" in
+          type_error e err_msg
+      end
+    | Ast.Id id -> 
+      begin match Tctxt.lookup_option id c with
+      | Some s -> s
+      | None -> 
+        begin match Tctxt.lookup_function_option id c with
+        | Some (ty_list, ret_typ) -> 
+          begin match ret_typ with
+          | Ast.RetVal ty -> ty
+          | _ -> let err_msg = "Function " ^ id ^ " is ill-typed according to steve" in
+          type_error e err_msg
+          end
+        | None -> let err_msg = "Unknown identifier " ^ id in
+          type_error e err_msg
+        end
+      end
+    | Ast.Index (exp_node1, exp_node2) -> 
+      let t1 = typecheck_exp c exp_node1 in
+      let t2 = typecheck_exp c exp_node2 in
+      begin match t1, t2 with
+      | (Ast.TRef (Ast.RArray ty), Ast.TInt) -> ty
+      | _ -> type_error e "Improper indexing. Try again."
+      end
+    | Ast.Call (exp_node, exp_node_list) -> 
+      let t = typecheck_exp c exp_node in
+      let _ = List.map (fun a -> typecheck_exp c a) exp_node_list in
+      t
     | Ast.Bop (binop_, exp_node1, exp_node2) -> 
       Printf.printf "Bop!\n";
       let (t1,t2,t) = typ_of_binop binop_ in
@@ -141,7 +180,7 @@ type stmt_type = NoReturn | Return
      lattice of stmt_type values given by the reflexive relation, plus:
            Return <: NoReturn
      Intuitively: if one of the two branches of a conditional does not contain a 
-     return statement, then the entier conditional statement might not return.
+     return statement, then the entire conditional statement might not return.
 
    - You will probably find it convenient to add a helper function that implements the 
      block typecheck rules.
@@ -149,11 +188,16 @@ type stmt_type = NoReturn | Return
 let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.t * stmt_type =
   begin match s.elt with 
   | Ast.Assn (e1, e2) -> (tc, NoReturn)    
-  | Ast.Decl vd -> (tc, NoReturn)                 
+  | Ast.Decl vd -> 
+    let id, exp_node = vd in
+    let exp_ty = typecheck_exp tc exp_node in
+    let new_c = Tctxt.add_local tc id exp_ty in
+     (new_c, NoReturn)
   | Ast.Ret e_opt -> (tc, NoReturn)              
   | Ast.SCall (e, e_lst) -> (tc, NoReturn) 
   | Ast.For (vd_lst, e_opt, stmt_opt, blk) -> (tc, NoReturn) 
   | Ast.While (e_n, blk) -> (tc, NoReturn) 
+  | Ast.If (e_n, b1, b2) -> (tc, NoReturn) 
   end
 
 
@@ -171,7 +215,6 @@ let rec typecheck_ty (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.ty) : unit =
   | Ast.TBool -> ()
   | Ast.TInt -> ()
   | TRef rty -> typecheck_ref l tc rty
-  | _ -> type_error l "Type not allowed"
   end
 
 and typecheck_ref (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.rty) : unit =
@@ -210,8 +253,16 @@ let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
     - checks that the function actually returns
 *)
 
-let typecheck_block (tc : Tctxt.t) (f : Ast.block) (l : 'a Ast.node)  =
-  failwith ""
+let typecheck_block (tc : Tctxt.t) (body : Ast.block) (l : 'a Ast.node) rtyp =
+  let _ = List.fold_left (fun ctxt stmt_n -> 
+    let new_c, stmt_ty = typecheck_stmt ctxt stmt_n rtyp in
+    (* 
+    
+    STUFF
+
+     *)
+    new_c
+  ) tc body in ()
 
 (* type fdecl =
   { rtyp : ret_ty
@@ -223,7 +274,7 @@ let typecheck_block (tc : Tctxt.t) (f : Ast.block) (l : 'a Ast.node)  =
   
   args = (ty * id) list
   
-
+  block = stmt node list
 *)
 
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
@@ -232,13 +283,14 @@ let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let args = f.args in
   let body = f.body in
   let _ = typecheck_ret_ty rtyp l tc in
-  let new_tc = List.fold_left (fun c (t, i) -> Tctxt.add_local c i t) tc args
+  let new_tc = List.fold_left (fun c (t, i) -> Tctxt.add_local c i t) tc args in
+  typecheck_block tc body l rtyp
   (* 
 
     TODO: FINISH
 
    *)
-  in ()
+  (* in () *)
 
 
 

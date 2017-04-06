@@ -462,7 +462,8 @@ let get_struct_defns (p:Ast.prog) : TypeCtxt.t =
    NOTE: The Gid of a function is just its source name
 *)
 let cmp_function_ctxt (tc : TypeCtxt.t) (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
-  failwith "todo: cmp_function_ctxt not finished"
+  c
+  (* failwith "todo: cmp_function_ctxt not finished" *)
 
 (* Populate a context with bindings for global variables 
    mapping OAT identifiers to LLVMlite gids and their types.
