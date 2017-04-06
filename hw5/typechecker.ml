@@ -121,19 +121,6 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
         t
       else
         type_error e "Incompatible unop operand types"
-
-
-
-(* (* binary operation types --------------------------------------------------- *)
-let typ_of_binop : Ast.binop -> Ast.ty * Ast.ty * Ast.ty = function
-  | Add | Mul | Sub | Shl | Shr | Sar | IAnd | IOr -> (TInt, TInt, TInt)
-  | Eq | Neq | Lt | Lte | Gt | Gte -> (TInt, TInt, TBool)
-  | And | Or -> (TBool, TBool, TBool)
-
-(* unary operation types ---------------------------------------------------- *)
-let typ_of_unop : Ast.unop -> Ast.ty * Ast.ty = function
-  | Neg | Bitnot -> (TInt, TInt)
-  | Lognot       -> (TBool, TBool) *)
   end
 
 
@@ -160,7 +147,14 @@ type stmt_type = NoReturn | Return
      block typecheck rules.
 *)
 let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.t * stmt_type =
-failwith "typecheck_stmt not implemented"
+  begin match s.elt with 
+  | Ast.Assn (e1, e2) -> (tc, NoReturn)    
+  | Ast.Decl vd -> (tc, NoReturn)                 
+  | Ast.Ret e_opt -> (tc, NoReturn)              
+  | Ast.SCall (e, e_lst) -> (tc, NoReturn) 
+  | Ast.For (vd_lst, e_opt, stmt_opt, blk) -> (tc, NoReturn) 
+  | Ast.While (e_n, blk) -> (tc, NoReturn) 
+  end
 
 
 (* well-formed types -------------------------------------------------------- *)
