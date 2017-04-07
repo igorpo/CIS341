@@ -216,11 +216,12 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
     end
   | Ast.Ret e_opt -> 
     begin match e_opt with
-    | Some s -> 
-      let t = typecheck_exp tc s in
+    | Some ex -> 
+      let typ_ex = typecheck_exp tc ex in
       begin match to_ret with
-      | Ast.RetVal t1 -> if t1 = t then (tc, Return) else type_error s "Return type mismatch"
-      | _ -> type_error s "Return type mismatch"
+      | Ast.RetVal t1 -> 
+        if t1 = typ_ex then (tc, Return) else type_error s "Return type mismatch"
+      | _ -> type_error s "Expecting "
       end
     | None -> 
       begin match to_ret with
@@ -245,7 +246,7 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
     let (l2_ctxt, _) = 
       List.fold_left 
         (fun (ctxt,_) vd -> 
-          typecheck_stmt ctxt (Ast.no_loc (Ast.Decl vd)) Ast.RetVoid) (tc,NoReturn) vd_lst in
+          typecheck_stmt ctxt (Ast.no_loc (Ast.Decl vd)) to_ret) (tc, NoReturn) vd_lst in
     let e_bool = begin match e_opt with
     | Some s1 -> typecheck_exp l2_ctxt s1
     | None -> Ast.TBool
@@ -253,25 +254,25 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
     begin match e_bool with
     | Ast.TBool -> 
       let l3_ctxt = begin match stmt_opt with
-      | Some s2 -> let c, _ = typecheck_stmt l2_ctxt s2 Ast.RetVoid in c
+      | Some s2 -> let c, _ = typecheck_stmt l2_ctxt s2 to_ret in c
       | None -> l2_ctxt
       end in
-      let st_ty = typecheck_block l2_ctxt blk Ast.RetVoid in
+      let st_ty = typecheck_block l3_ctxt blk to_ret in
       (tc, st_ty)
     | _ -> type_error s "Expression must be of type bool"
     end
   | Ast.While (e_n, blk) -> 
     begin match typecheck_exp tc e_n with
     | TBool ->
-      let st_ty = typecheck_block tc blk Ast.RetVoid in
+      let st_ty = typecheck_block tc blk to_ret in
       (tc, st_ty)
     | _ -> type_error s "Expression must be of type bool"
     end
   | Ast.If (e_n, b1, b2) -> 
     begin match typecheck_exp tc e_n with
     | TBool ->
-      let st_ty1 = typecheck_block tc b1 Ast.RetVoid in
-      let st_ty2 = typecheck_block tc b2 Ast.RetVoid in
+      let st_ty1 = typecheck_block tc b1 to_ret in
+      let st_ty2 = typecheck_block tc b2 to_ret in
       begin match st_ty1, st_ty2 with
       | Return, Return -> (tc, Return)
       | _ -> (tc, NoReturn)
@@ -353,7 +354,11 @@ let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let body = f.body in
   let _ = typecheck_ret_ty rtyp l tc in
   let new_tc = List.fold_left (fun c (t, i) -> Tctxt.add_local c i t) tc args in
-  let st_ty = typecheck_block new_tc body rtyp in ()
+  let st_ty = typecheck_block new_tc body rtyp in 
+  if st_ty <> Return then type_error l "Function must return"
+  else
+  ()
+
   (* 
 
     TODO: FINISH

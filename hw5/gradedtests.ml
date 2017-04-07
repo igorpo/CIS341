@@ -37,7 +37,7 @@ let typecheck_error (a : assertion) () =
   try a (); failwith "Should have a type error" with Typechecker.TypeError s -> ()
 
 let typecheck_correct (a : assertion) () =
-  try a () with Typechecker.TypeError s -> failwith "Should not have had a type error"
+  try a () with Typechecker.TypeError s -> (* Printf.printf "Error: %s\n" s;  *)failwith "Should not have had a type error"
 
 let executed_oat_file tests =
   List.map (fun (path, args, ans) ->
@@ -277,7 +277,7 @@ let fptr_tests = [
 ]
 
 let our_test = [
-    ("hw5programs/tc_error_function_no_shadow.oat");
+    ("hw5programs/tc_correct_for.oat");
   ]
 
 let hw5_tests : suite =
@@ -286,7 +286,7 @@ let hw5_tests : suite =
     GradedTest("fptr tests", 15, executed_oat_file fptr_tests);   
 
 
-    (* GradedTest("our_test tests", 20, typecheck_file_error our_test); *)
+    (* GradedTest("our_test tests", 20, typecheck_file_correct our_test); *)
   ]
 
 
