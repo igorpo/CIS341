@@ -277,7 +277,7 @@ let fptr_tests = [
 ]
 
 let our_test = [
-    ("hw5programs/compile_nested_struct.oat", "", "0");
+    ("hw5programs/tc_error_function_no_shadow.oat");
   ]
 
 let hw5_tests : suite =
@@ -286,7 +286,7 @@ let hw5_tests : suite =
     GradedTest("fptr tests", 15, executed_oat_file fptr_tests);   
 
 
-    (* GradedTest("our_test tests", 20, executed_oat_file our_test); *)
+    (* GradedTest("our_test tests", 20, typecheck_file_error our_test); *)
   ]
 
 

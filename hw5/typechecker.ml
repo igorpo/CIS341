@@ -86,7 +86,7 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
     | Ast.CInt int64_ -> Ast.TInt
     | Ast.CStr string_ -> Ast.TRef (Ast.RString)
     | Ast.CArr (ty, exp_node_list) -> 
-      if List.for_all (fun x -> (typecheck_exp c x) = ty) exp_node_list then ty 
+      if List.for_all (fun x -> (typecheck_exp c x) = ty) exp_node_list then (Ast.TRef (Ast.RArray ty))
       else type_error e "Array type mismatch"
     | Ast.CStruct (id, cfield_list) -> 
       let sorted_cf_list = List.sort cflist_compare cfield_list in
@@ -115,7 +115,7 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
       end
     | Ast.NewArr (ty, exp_node) -> 
       begin match typecheck_exp c exp_node with
-      | Ast.TInt -> ty
+      | Ast.TInt -> Ast.TRef (Ast.RArray ty)
       | _ -> let err_msg = "NewArr size expression must evaluate to an integer" in
           type_error e err_msg
       end
@@ -126,10 +126,8 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
         begin match Tctxt.lookup_function_option id c with
         | Some (ty_list, ret_typ) -> 
           begin match ret_typ with
-          | Ast.RetVal ty -> ty
+          | Ast.RetVal ty -> Ast.TRef (Ast.RFun (ty_list, Ast.RetVal ty)) 
           | Ast.RetVoid -> Ast.TRef (Ast.RFun (ty_list, Ast.RetVoid))
-          | _ -> let err_msg = "Function " ^ id ^ " is ill-typed according to steve" in
-          type_error e err_msg
           end
         | None -> let err_msg = "Unknown identifier " ^ id in
           type_error e err_msg
@@ -144,8 +142,16 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
       end
     | Ast.Call (exp_node, exp_node_list) -> 
       let t = typecheck_exp c exp_node in
-      let _ = List.map (fun a -> typecheck_exp c a) exp_node_list in
-      t
+      begin match t with
+      | Ast.TRef (Ast.RFun (ty_list, Ast.RetVal ret_ty)) -> 
+        if (List.length exp_node_list) <> (List.length ty_list) then 
+          type_error e "Wrong number of arguments"
+        else
+          let flag = List.for_all2 (fun ex t1 -> t1 = (typecheck_exp c ex)) exp_node_list ty_list in
+          if flag = true then ret_ty else 
+          let msg = "argument types don't match" in type_error e msg
+      | _ -> type_error e "Must be a non void function"
+      end
     | Ast.Bop (binop_, exp_node1, exp_node2) -> 
       let (t1,t2,t) = typ_of_binop binop_ in
       let tc_t1 = typecheck_exp c exp_node1 in
@@ -153,7 +159,8 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
       if tc_t1 = t1 && tc_t2 = t2 then
         t
       else
-        type_error e "Incompatible binop operand types"
+        let msg = "Incompatible binop operand types" in
+        type_error e msg
     | Ast.Uop (unop_, exp_node) -> 
       let (t1,t) = typ_of_unop unop_ in
       let tc_t1 = typecheck_exp c exp_node in
@@ -200,14 +207,13 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
   | Ast.Decl vd -> 
 
     let id, exp_node = vd in
-    begin match Tctxt.lookup_option id tc with
+    begin match Tctxt.lookup_local_option id tc with
     | Some _ -> type_error s "Not allowed to redeclare variable"
     | None -> 
       let exp_ty = typecheck_exp tc exp_node in
       let new_c = Tctxt.add_local tc id exp_ty in
      (new_c, NoReturn)
     end
-    
   | Ast.Ret e_opt -> 
     begin match e_opt with
     | Some s -> 
@@ -216,7 +222,7 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
       | Ast.RetVal t1 -> if t1 = t then (tc, Return) else type_error s "Return type mismatch"
       | _ -> type_error s "Return type mismatch"
       end
-    | None ->
+    | None -> 
       begin match to_ret with
       | Ast.RetVal _ -> type_error s "Return type mismatch"
       | _ -> (tc, Return)
@@ -347,7 +353,7 @@ let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let body = f.body in
   let _ = typecheck_ret_ty rtyp l tc in
   let new_tc = List.fold_left (fun c (t, i) -> Tctxt.add_local c i t) tc args in
-  let st_ty = typecheck_block tc body rtyp in ()
+  let st_ty = typecheck_block new_tc body rtyp in ()
   (* 
 
     TODO: FINISH
@@ -417,9 +423,9 @@ let create_function_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
   in
   List.fold_left (fun ctxt el ->
     match el with
-    | Gfdecl ({elt=f}) -> 
+    | Gfdecl ({elt=f} as l) -> 
       if check_fdecl_redeclare ctxt f.name then 
-        ctxt
+        type_error l "Trying to redeclare a function"
       else 
         let arg_types = List.map (fun (t,i) -> t) f.args in
         Tctxt.add_function ctxt f.name (arg_types,f.rtyp)
