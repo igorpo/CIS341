@@ -198,10 +198,16 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
     else
     (tc, NoReturn)    
   | Ast.Decl vd -> 
+
     let id, exp_node = vd in
-    let exp_ty = typecheck_exp tc exp_node in
-    let new_c = Tctxt.add_local tc id exp_ty in
+    begin match Tctxt.lookup_option id tc with
+    | Some _ -> type_error s "Not allowed to redeclare variable"
+    | None -> 
+      let exp_ty = typecheck_exp tc exp_node in
+      let new_c = Tctxt.add_local tc id exp_ty in
      (new_c, NoReturn)
+    end
+    
   | Ast.Ret e_opt -> 
     begin match e_opt with
     | Some s -> 
@@ -244,27 +250,41 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
       | Some s2 -> let c, _ = typecheck_stmt l2_ctxt s2 Ast.RetVoid in c
       | None -> l2_ctxt
       end in
-      begin match (typecheck_block l2_ctxt blk Ast.RetVoid) with
-      | () -> (tc, NoReturn)
-      | _ -> type_error s "Bad"
+      let st_ty = typecheck_block l2_ctxt blk Ast.RetVoid in
+      (tc, st_ty)
+    | _ -> type_error s "Expression must be of type bool"
+    end
+  | Ast.While (e_n, blk) -> 
+    begin match typecheck_exp tc e_n with
+    | TBool ->
+      let st_ty = typecheck_block tc blk Ast.RetVoid in
+      (tc, st_ty)
+    | _ -> type_error s "Expression must be of type bool"
+    end
+  | Ast.If (e_n, b1, b2) -> 
+    begin match typecheck_exp tc e_n with
+    | TBool ->
+      let st_ty1 = typecheck_block tc b1 Ast.RetVoid in
+      let st_ty2 = typecheck_block tc b2 Ast.RetVoid in
+      begin match st_ty1, st_ty2 with
+      | Return, Return -> (tc, Return)
+      | _ -> (tc, NoReturn)
       end
     | _ -> type_error s "Expression must be of type bool"
     end
-    
-  | Ast.While (e_n, blk) -> (tc, NoReturn) 
-  | Ast.If (e_n, b1, b2) -> (tc, NoReturn) 
   end
 
-and typecheck_block (tc : Tctxt.t) (body : Ast.block) (to_ret:ret_ty) =
-  let _ = List.fold_left (fun ctxt stmt_n -> 
+and typecheck_block (tc : Tctxt.t) (body : Ast.block) (to_ret:ret_ty) : stmt_type =
+  let _, f_st_ty = 
+  List.fold_left (fun (ctxt, st_ty) stmt_n -> 
     let new_c, stmt_ty = typecheck_stmt ctxt stmt_n to_ret in
-    (* 
+    begin match st_ty, stmt_ty with
+    | Return, Return -> type_error (no_loc body) "Multiple return statements"
+    | NoReturn, NoReturn -> (new_c, NoReturn)
+    | _ -> (new_c, Return)  
     
-    STUFF?
-
-     *)
-    new_c
-  ) tc body in ()
+    end
+  ) (tc, NoReturn) body in (f_st_ty)
 
 
 (* well-formed types -------------------------------------------------------- *)
@@ -320,8 +340,6 @@ let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
     - checks that the function actually returns
 *)
 
-
-
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let rtyp = f.rtyp in
   let name = f.name in
@@ -329,7 +347,7 @@ let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let body = f.body in
   let _ = typecheck_ret_ty rtyp l tc in
   let new_tc = List.fold_left (fun c (t, i) -> Tctxt.add_local c i t) tc args in
-  typecheck_block tc body rtyp
+  let st_ty = typecheck_block tc body rtyp in ()
   (* 
 
     TODO: FINISH
@@ -380,11 +398,16 @@ let create_struct_ctxt p =
   let c = Tctxt.empty in 
   List.fold_left (fun ctxt el ->
     match el with
-    | Gtdecl ({elt=(id, fs)}) -> 
-      if check_dups fs then 
-        ctxt
-      else 
-        Tctxt.add_struct ctxt id fs 
+    | Gtdecl ({elt=(id, fs)} as l) -> 
+      begin match Tctxt.lookup_struct_option id ctxt with
+      | Some s -> type_error l "Already declared struct with same name"
+      | None -> 
+        if check_dups fs then 
+          type_error l "Duplicate fields in struct declaration"
+        else 
+          Tctxt.add_struct ctxt id fs 
+      end
+      
     | _ -> ctxt) c p
 
 
@@ -408,26 +431,30 @@ let create_global_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
     | Gvdecl gdec -> 
       let name = gdec.elt.name in
       let init = gdec.elt.init in
-      begin match init.elt with
-      | Id i -> 
-          if check_global_id_mention ctxt name then
-            begin match Tctxt.lookup_function_option i ctxt with
-            | Some (_,ret_ty) -> 
-              begin match ret_ty with
-              | RetVal ret_ty_ty -> Tctxt.add_global ctxt name ret_ty_ty
-              | RetVoid -> type_error gdec "Void function not allowed"
+      if check_global_id_mention ctxt name then
+        type_error gdec "Already declared global with same name"
+      else
+        begin match init.elt with
+        | Id i -> 
+            (if check_global_id_mention ctxt name then
+              begin match Tctxt.lookup_function_option i ctxt with
+              | Some (_,ret_ty) -> 
+                begin match ret_ty with
+                | RetVal ret_ty_ty -> Tctxt.add_global ctxt name ret_ty_ty
+                | RetVoid -> type_error gdec "Void function not allowed"
+                end
+              | None -> type_error gdec "Reference to nonexistent function name"
               end
-            | None -> type_error gdec "Reference to nonexistent function name"
-            end
-          else ctxt
-      | CNull t -> Tctxt.add_global ctxt name t
-      | CBool _ -> Tctxt.add_global ctxt name Ast.TBool
-      | CInt _ -> Tctxt.add_global ctxt name Ast.TInt
-      | CStr _ -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RString))
-      | CArr (t, _) -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RArray t))
-      | CStruct (id, _) -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RStruct id))
-      | _ -> type_error gdec "Type not allowed in global declaration"
-      end
+            else 
+              type_error gdec "Reference to nonexistent global name")
+        | CNull t -> Tctxt.add_global ctxt name t
+        | CBool _ -> Tctxt.add_global ctxt name Ast.TBool
+        | CInt _ -> Tctxt.add_global ctxt name Ast.TInt
+        | CStr _ -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RString))
+        | CArr (t, _) -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RArray t))
+        | CStruct (id, _) -> Tctxt.add_global ctxt name (Ast.TRef (Ast.RStruct id))
+        | _ -> type_error gdec "Type not allowed in global declaration"
+        end
     | _ -> ctxt) tc p
 
 (* typechecks the whole program in the correct global context --------------- *)
