@@ -127,6 +127,7 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
         | Some (ty_list, ret_typ) -> 
           begin match ret_typ with
           | Ast.RetVal ty -> ty
+          | Ast.RetVoid -> Ast.TRef (Ast.RFun (ty_list, Ast.RetVoid))
           | _ -> let err_msg = "Function " ^ id ^ " is ill-typed according to steve" in
           type_error e err_msg
           end
@@ -146,7 +147,6 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
       let _ = List.map (fun a -> typecheck_exp c a) exp_node_list in
       t
     | Ast.Bop (binop_, exp_node1, exp_node2) -> 
-      Printf.printf "Bop!\n";
       let (t1,t2,t) = typ_of_binop binop_ in
       let tc_t1 = typecheck_exp c exp_node1 in
       let tc_t2 = typecheck_exp c exp_node2 in
@@ -186,6 +186,8 @@ type stmt_type = NoReturn | Return
    - You will probably find it convenient to add a helper function that implements the 
      block typecheck rules.
 *)
+
+
 let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.t * stmt_type =
   begin match s.elt with 
   | Ast.Assn (lhs, rhs) -> 
@@ -194,13 +196,7 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
     if t1 <> t2 then
       type_error s "Assignment illegal, types do not match"
     else
-      let new_c = begin match lhs.elt with
-      | Ast.Id id -> Tctxt.add_local tc id t1
-      | Ast.Index (e1,e2) -> tc
-      | Ast.Proj (e, id) -> tc
-      | _ -> type_error s "Illegal lhs of assignment"
-      end in
-    (new_c, NoReturn)    
+    (tc, NoReturn)    
   | Ast.Decl vd -> 
     let id, exp_node = vd in
     let exp_ty = typecheck_exp tc exp_node in
@@ -209,23 +205,66 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
   | Ast.Ret e_opt -> 
     begin match e_opt with
     | Some s -> 
-      (*
-      
-        TODO: we were here
-      
-      *)
-
-      (* let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
-      let t = typecheck_exp tc s in *)
-      (tc, Return)
-    | None -> 
-      (tc, Return)
+      let t = typecheck_exp tc s in
+      begin match to_ret with
+      | Ast.RetVal t1 -> if t1 = t then (tc, Return) else type_error s "Return type mismatch"
+      | _ -> type_error s "Return type mismatch"
+      end
+    | None ->
+      begin match to_ret with
+      | Ast.RetVal _ -> type_error s "Return type mismatch"
+      | _ -> (tc, Return)
+      end
     end
-  | Ast.SCall (e, e_lst) -> (tc, NoReturn) 
-  | Ast.For (vd_lst, e_opt, stmt_opt, blk) -> (tc, NoReturn) 
+  | Ast.SCall (e, e_lst) -> 
+    begin match typecheck_exp tc e with
+    | Ast.TRef (Ast.RFun (ty_list, Ast.RetVoid)) -> 
+      if (List.length e_lst) <> (List.length ty_list) then 
+        type_error s "Wrong number of arguments"
+      else
+        let flag = List.for_all2 (fun ex t -> t = (typecheck_exp tc ex)) e_lst ty_list in
+        if flag <> true then
+          type_error s "Argument type mismatch"
+        else
+          (tc, NoReturn) 
+    | _ -> type_error s "Tried to call non-void function"
+    end
+  | Ast.For (vd_lst, e_opt, stmt_opt, blk) -> 
+    let (l2_ctxt, _) = 
+      List.fold_left 
+        (fun (ctxt,_) vd -> 
+          typecheck_stmt ctxt (Ast.no_loc (Ast.Decl vd)) Ast.RetVoid) (tc,NoReturn) vd_lst in
+    let e_bool = begin match e_opt with
+    | Some s1 -> typecheck_exp l2_ctxt s1
+    | None -> Ast.TBool
+    end in
+    begin match e_bool with
+    | Ast.TBool -> 
+      let l3_ctxt = begin match stmt_opt with
+      | Some s2 -> let c, _ = typecheck_stmt l2_ctxt s2 Ast.RetVoid in c
+      | None -> l2_ctxt
+      end in
+      begin match (typecheck_block l2_ctxt blk Ast.RetVoid) with
+      | () -> (tc, NoReturn)
+      | _ -> type_error s "Bad"
+      end
+    | _ -> type_error s "Expression must be of type bool"
+    end
+    
   | Ast.While (e_n, blk) -> (tc, NoReturn) 
   | Ast.If (e_n, b1, b2) -> (tc, NoReturn) 
   end
+
+and typecheck_block (tc : Tctxt.t) (body : Ast.block) (to_ret:ret_ty) =
+  let _ = List.fold_left (fun ctxt stmt_n -> 
+    let new_c, stmt_ty = typecheck_stmt ctxt stmt_n to_ret in
+    (* 
+    
+    STUFF?
+
+     *)
+    new_c
+  ) tc body in ()
 
 
 (* well-formed types -------------------------------------------------------- *)
@@ -281,16 +320,6 @@ let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
     - checks that the function actually returns
 *)
 
-let typecheck_block (tc : Tctxt.t) (body : Ast.block) (l : 'a Ast.node) rtyp =
-  let _ = List.fold_left (fun ctxt stmt_n -> 
-    let new_c, stmt_ty = typecheck_stmt ctxt stmt_n rtyp in
-    (* 
-    
-    STUFF
-
-     *)
-    new_c
-  ) tc body in ()
 
 
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
@@ -300,7 +329,7 @@ let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let body = f.body in
   let _ = typecheck_ret_ty rtyp l tc in
   let new_tc = List.fold_left (fun c (t, i) -> Tctxt.add_local c i t) tc args in
-  typecheck_block tc body l rtyp
+  typecheck_block tc body rtyp
   (* 
 
     TODO: FINISH
