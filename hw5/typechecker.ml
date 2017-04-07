@@ -258,14 +258,14 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
       | None -> l2_ctxt
       end in
       let st_ty = typecheck_block l3_ctxt blk to_ret in
-      (tc, st_ty)
+      (tc, NoReturn)
     | _ -> type_error s "Expression must be of type bool"
     end
   | Ast.While (e_n, blk) -> 
     begin match typecheck_exp tc e_n with
     | TBool ->
       let st_ty = typecheck_block tc blk to_ret in
-      (tc, st_ty)
+      (tc, NoReturn)
     | _ -> type_error s "Expression must be of type bool"
     end
   | Ast.If (e_n, b1, b2) -> 
