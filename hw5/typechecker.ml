@@ -448,16 +448,14 @@ let create_global_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
         begin match init.elt with
         | Id i -> 
             (if check_global_id_mention ctxt name then
+              type_error gdec "Not allowed to reference global from global declaration"
+            else
               begin match Tctxt.lookup_function_option i ctxt with
-              | Some (_,ret_ty) -> 
-                begin match ret_ty with
-                | RetVal ret_ty_ty -> Tctxt.add_global ctxt name ret_ty_ty
-                | RetVoid -> type_error gdec "Void function not allowed"
-                end
+              | Some fun_det -> 
+                Tctxt.add_global ctxt name (Ast.TRef (Ast.RFun fun_det))
               | None -> type_error gdec "Reference to nonexistent function name"
               end
-            else 
-              type_error gdec "Reference to nonexistent global name")
+              )
         | CNull t -> Tctxt.add_global ctxt name t
         | CBool _ -> Tctxt.add_global ctxt name Ast.TBool
         | CInt _ -> Tctxt.add_global ctxt name Ast.TInt
