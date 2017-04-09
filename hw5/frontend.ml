@@ -266,15 +266,18 @@ let rec cmp_exp (tc : TypeCtxt.t) (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.ope
             is properly initialized
   *)
   | Ast.Id id ->
-    
-        let t, op = Ctxt.lookup id c in
-        begin match t with
-          | Ptr t ->
-            let ans_id = gensym id in
-            t, Id ans_id, [I(ans_id, Load(Ptr t, op))]
-          | _ -> failwith "broken invariant: identifier not a pointer"
+        begin match Ctxt.lookup_function_option id c with
+        | Some (f_t, f_op) -> f_t, f_op, []
+        | None -> 
+          let t, op = Ctxt.lookup id c in
+          begin match t with
+            | Ptr t ->
+              let ans_id = gensym id in
+              t, Id ans_id, [I(ans_id, Load(Ptr t, op))]
+            | _ -> failwith "broken invariant: identifier not a pointer"
+          end
         end
-        
+                
 
   | Ast.Index (e, i) ->
     let ans_ty, ptr_op, code = cmp_exp_lhs tc c exp in
@@ -460,10 +463,33 @@ let get_struct_defns (p:Ast.prog) : TypeCtxt.t =
      treated when constructing init_ctxt (below).
 
    NOTE: The Gid of a function is just its source name
+
+   and fty = ty list * ty 
+
+
 *)
 let cmp_function_ctxt (tc : TypeCtxt.t) (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
-  c
-  (* failwith "todo: cmp_function_ctxt not finished" *)
+  List.fold_left (fun ctxt decl -> 
+      begin match decl with
+      | Gfdecl {elt=fdecl} ->
+        let name = fdecl.name in
+        let args = fdecl.args in
+        let ll_ty_list = List.map (fun (x,_) -> cmp_ty tc x) args in
+        let ret_ty = cmp_ret_ty tc fdecl.rtyp in
+        let fun_ty = Ll.Fun (ll_ty_list, ret_ty) in
+        Ctxt.add ctxt name (Ptr fun_ty, Gid name)
+        
+        (* begin match fdecl.rtyp with
+        | Ast.RetVoid -> 
+          let fun_ty = Ll.Fun (ll_ty_list, Ll.Void) in
+          Ctxt.add ctxt name (Ll.Ptr fun_ty, Gid name)
+        | Ast.RetVal ast_t -> 
+          let t = cmp_ty tc ast_t in *)
+          
+        (* end *)
+      | _ -> ctxt
+      end)
+      c p
 
 (* Populate a context with bindings for global variables 
    mapping OAT identifiers to LLVMlite gids and their types.

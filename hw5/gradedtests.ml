@@ -277,7 +277,8 @@ let fptr_tests = [
 ]
 
 let our_test = [
-    ("hw5programs/tc_correct_while.oat");
+    (* ("hw5programs/tc_correct_while.oat"); *)
+    ("atprograms/run13.oat", "", "1");
   ]
 
 let hw5_tests : suite =
@@ -286,7 +287,7 @@ let hw5_tests : suite =
     GradedTest("fptr tests", 15, executed_oat_file fptr_tests);   
 
 
-    (* GradedTest("our_test tests", 20, typecheck_file_correct our_test); *)
+    (* GradedTest("our_test tests", 20, executed_oat_file our_test); *)
   ]
 
 
