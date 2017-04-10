@@ -149,7 +149,11 @@ and cmp_fty ct (ts,r:Ast.fty) : Ll.fty =
 and cmp_rty ct : Ast.rty -> Ll.ty = function
   | Ast.RString  -> I8
   | Ast.RArray u -> Struct [I64; Array(0, cmp_ty ct u)]
-  (* TODO: add cases for structs and funs *)
+  | RStruct id -> 
+    let s_f_list = TypeCtxt.lookup id ct in
+    let ty_list = List.map (fun f -> cmp_ty ct f.ftyp) s_f_list in
+    Struct ty_list
+  | RFun fty -> Fun (cmp_fty ct fty)
 
 let typ_of_binop : Ast.binop -> Ast.ty * Ast.ty * Ast.ty = function
   | Add | Mul | Sub | Shl | Shr | Sar | IAnd | IOr -> (TInt, TInt, TInt)
@@ -197,7 +201,14 @@ let oat_alloc_array ct (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
    - make sure to calculate the correct amount of space to allocate!
 *)
 let oat_alloc_struct ct (id:Ast.id) : Ll.ty * operand * stream =
-failwith "oat_alloc_struct unimplemented"
+  let f_list = TypeCtxt.lookup id ct in
+  let ll_ty_list = List.map (fun f -> cmp_ty ct f.ftyp) f_list in
+  let size = List.fold_left (fun c f -> Int64.add c (size_oat_ty f.ftyp)) 0L f_list in
+  let ans_ty = Struct ll_ty_list in
+  let struct_ty = Ptr I64 in
+  ans_ty, Id id, lift
+    [ id, Call(struct_ty, Gid "oat_malloc", [I64, Const size])  
+    ; id, Bitcast(struct_ty, Id id, ans_ty) ]
 
 let str_arr_ty s = Array(1 + String.length s, I8)
 let i1_op_of_bool b   = Ll.Const (if b then 1L else 0L)
@@ -260,11 +271,7 @@ let rec cmp_exp (tc : TypeCtxt.t) (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.ope
       | Ast.Lognot -> Icmp  (Eq, I1, op, i1_op_of_bool false)
       | Ast.Bitnot -> Binop (Xor, I64, op, i64_op_of_int (-1)) in
     cmp_ty tc ret_ty, Id ans_id, code >:: I (ans_id, cmp_uop op uop)
-
-  (* TASK: Modify this case to handle function identifiers as values.
-     Hint:  it should be very straightforward, assuming that the context
-            is properly initialized
-  *)
+  
   | Ast.Id id ->
         begin match Ctxt.lookup_function_option id c with
         | Some (f_t, f_op) -> f_t, f_op, []
@@ -313,7 +320,18 @@ let rec cmp_exp (tc : TypeCtxt.t) (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.ope
        - store the resulting value into the structure
    *)
   | Ast.CStruct (id, l) ->
-    failwith "TODO: constant structs"                       
+    let st_ty, st_op, st_code = oat_alloc_struct tc id in
+    let strm = List.fold_left (fun s f -> 
+      let fname = f.cfname in
+      let e = f.cfinit in
+      let ll_ty, ll_op, ll_strm = cmp_exp tc c e in
+      let index = TypeCtxt.index_of_field id fname tc in
+      let ptr_id = gensym fname in
+      s >@ ll_strm >@ lift
+      [ ptr_id, Gep(st_ty, st_op, [i64_op_of_int 0; i64_op_of_int (index * 8)]) 
+      ; "", Store(ll_ty, ll_op, Id ptr_id)]      
+    ) [] l in 
+    st_ty, st_op, st_code >@ strm
 
   | Ast.Proj (e, id) ->
     let ans_ty, ptr_op, code = cmp_exp_lhs tc c exp in
@@ -332,9 +350,15 @@ and cmp_exp_lhs (tc : TypeCtxt.t) (c:Ctxt.t) (e:exp node) : Ll.ty * Ll.operand *
      the actual load from the address to project the value is handled by the
      Ast.proj case of the cmp_exp function (above).
   *)
-  | Ast.Proj (e, i) ->
-  failwith "TODO: field projection as left-hand side"
 
+  | Ast.Proj (e, i) ->
+    let st_ty, st_op, e_code = cmp_exp tc c e in
+    let base_ty, index = TypeCtxt.lookup_field_name i tc in
+    let field_ty = cmp_ty tc base_ty in
+    let ptr_id = gensym "proj_field" in
+    let strm = lift [ptr_id, Gep(st_ty, st_op, [i64_op_of_int 0; Const (Int64.mul index 8L)])] in
+    field_ty, Id ptr_id, e_code >@ strm
+    
   | Ast.Index (e, i) ->
     let arr_ty, arr_op, arr_code = cmp_exp tc c e in
     let _, ind_op, ind_code = cmp_exp tc c i in
@@ -456,18 +480,6 @@ let get_struct_defns (p:Ast.prog) : TypeCtxt.t =
     | _ -> ts) p TypeCtxt.empty
 
 
-(* TASK (FIRST):  Complete this function that creates the "compiled" version of 
-   the F context.  It adds each function identifer to the context at an
-   appropriately translated type.  
-     Hint: use cmp_ty and take a look at how the builtin functions are
-     treated when constructing init_ctxt (below).
-
-   NOTE: The Gid of a function is just its source name
-
-   and fty = ty list * ty 
-
-
-*)
 let cmp_function_ctxt (tc : TypeCtxt.t) (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
   List.fold_left (fun ctxt decl -> 
       begin match decl with
@@ -478,15 +490,6 @@ let cmp_function_ctxt (tc : TypeCtxt.t) (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
         let ret_ty = cmp_ret_ty tc fdecl.rtyp in
         let fun_ty = Ll.Fun (ll_ty_list, ret_ty) in
         Ctxt.add ctxt name (Ptr fun_ty, Gid name)
-        
-        (* begin match fdecl.rtyp with
-        | Ast.RetVoid -> 
-          let fun_ty = Ll.Fun (ll_ty_list, Ll.Void) in
-          Ctxt.add ctxt name (Ll.Ptr fun_ty, Gid name)
-        | Ast.RetVal ast_t -> 
-          let t = cmp_ty tc ast_t in *)
-          
-        (* end *)
       | _ -> ctxt
       end)
       c p
