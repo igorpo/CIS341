@@ -204,11 +204,14 @@ let oat_alloc_struct ct (id:Ast.id) : Ll.ty * operand * stream =
   let f_list = TypeCtxt.lookup id ct in
   let ll_ty_list = List.map (fun f -> cmp_ty ct f.ftyp) f_list in
   let size = List.fold_left (fun c f -> Int64.add c (size_oat_ty f.ftyp)) 0L f_list in
-  let ans_ty = Struct ll_ty_list in
+  (* let ans_ty = Struct ll_ty_list in *)
+  let ans_ty = cmp_ty ct @@ TRef (RStruct id) in 
   let struct_ty = Ptr I64 in
-  ans_ty, Id id, lift
-    [ id, Call(struct_ty, Gid "oat_malloc", [I64, Const size])  
-    ; id, Bitcast(struct_ty, Id id, ans_ty) ]
+  let new_id = gensym "raw_"^id in 
+  let final_id = gensym id in 
+  ans_ty, Id final_id, lift
+    [ new_id, Call(struct_ty, Gid "oat_malloc", [I64, Const size])  
+    ; final_id, Bitcast(struct_ty, Id new_id, ans_ty) ]
 
 let str_arr_ty s = Array(1 + String.length s, I8)
 let i1_op_of_bool b   = Ll.Const (if b then 1L else 0L)
@@ -325,11 +328,14 @@ let rec cmp_exp (tc : TypeCtxt.t) (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.ope
       let fname = f.cfname in
       let e = f.cfinit in
       let ll_ty, ll_op, ll_strm = cmp_exp tc c e in
-      let index = TypeCtxt.index_of_field id fname tc in
+      let field_ty, index = TypeCtxt.lookup_field_name fname tc in
+      let ll_f_ty = cmp_ty tc field_ty in
+      let tmp_id = gensym "" in
       let ptr_id = gensym fname in
       s >@ ll_strm >@ lift
-      [ ptr_id, Gep(st_ty, st_op, [i64_op_of_int 0; i64_op_of_int (index * 8)]) 
-      ; "", Store(ll_ty, ll_op, Id ptr_id)]      
+      [ ptr_id, Gep(st_ty, st_op, [i64_op_of_int 0; Const index])
+      ; tmp_id, Bitcast(ll_ty, ll_op, ll_f_ty)
+      ; "", Store(ll_f_ty, Id tmp_id, Id ptr_id)]      
     ) [] l in 
     st_ty, st_op, st_code >@ strm
 
@@ -356,7 +362,7 @@ and cmp_exp_lhs (tc : TypeCtxt.t) (c:Ctxt.t) (e:exp node) : Ll.ty * Ll.operand *
     let base_ty, index = TypeCtxt.lookup_field_name i tc in
     let field_ty = cmp_ty tc base_ty in
     let ptr_id = gensym "proj_field" in
-    let strm = lift [ptr_id, Gep(st_ty, st_op, [i64_op_of_int 0; Const (Int64.mul index 8L)])] in
+    let strm = lift [ptr_id, Gep(st_ty, st_op, [i64_op_of_int 0; Const index])] in
     field_ty, Id ptr_id, e_code >@ strm
     
   | Ast.Index (e, i) ->

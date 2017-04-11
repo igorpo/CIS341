@@ -278,7 +278,8 @@ let fptr_tests = [
 
 let our_test = [
     (* ("hw5programs/tc_correct_while.oat"); *)
-    ("atprograms/run13.oat", "", "1");
+    (* ("atprograms/run13.oat", "", "1"); *)
+    ("hw5programs/compile_struct_array.oat", "", "15");
   ]
 
 let hw5_tests : suite =
