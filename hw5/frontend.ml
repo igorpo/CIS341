@@ -150,10 +150,33 @@ and cmp_rty ct : Ast.rty -> Ll.ty = function
   | Ast.RString  -> I8
   | Ast.RArray u -> Struct [I64; Array(0, cmp_ty ct u)]
   | RStruct id -> 
-    let s_f_list = TypeCtxt.lookup id ct in
-    let ty_list = List.map (fun f -> cmp_ty ct f.ftyp) s_f_list in
-    Struct ty_list
-  | RFun fty -> Fun (cmp_fty ct fty)
+    Namedt id
+    (* let s_f_list = TypeCtxt.lookup id ct in
+    let ty_list = List.map (fun f -> 
+      begin match f.ftyp with
+      | Ast.TRef (Ast.RStruct i) -> Namedt i
+      | _ -> cmp_ty ct f.ftyp
+      end) s_f_list in
+    Struct ty_list *)
+
+  | RFun fty -> 
+    let t_list, ret_ty = fty in
+    let ll_ret_ty = 
+    begin match ret_ty with
+    | Ast.RetVoid -> Void
+    | Ast.RetVal t ->
+      begin match t with
+      | Ast.TRef (Ast.RStruct i1) -> Ptr (Namedt i1)
+      | _ -> cmp_ret_ty ct ret_ty
+      end
+    end in
+    let ll_ty_list = List.map (fun t -> 
+      begin match t with
+      | Ast.TRef (Ast.RStruct i2) -> Ptr (Namedt i2)
+      | _ -> cmp_ty ct t
+      end
+      ) t_list in
+    Fun (ll_ty_list, ll_ret_ty)
 
 let typ_of_binop : Ast.binop -> Ast.ty * Ast.ty * Ast.ty = function
   | Add | Mul | Sub | Shl | Shr | Sar | IAnd | IOr -> (TInt, TInt, TInt)
@@ -202,12 +225,21 @@ let oat_alloc_array ct (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
 *)
 let oat_alloc_struct ct (id:Ast.id) : Ll.ty * operand * stream =
   let f_list = TypeCtxt.lookup id ct in
-  let ll_ty_list = List.map (fun f -> cmp_ty ct f.ftyp) f_list in
+  (* let ll_ty_list = List.map (fun f -> 
+    begin match f.ftyp with
+    | Ast.TRef (Ast.RStruct i) -> if i = id then 
+    | _ -> cmp_ty ct f.ftyp
+    end
+    cmp_ty ct f.ftyp) f_list in *)
+
   let size = List.fold_left (fun c f -> Int64.add c (size_oat_ty f.ftyp)) 0L f_list in
-  (* let ans_ty = Struct ll_ty_list in *)
-  let ans_ty = cmp_ty ct @@ TRef (RStruct id) in 
+  
+  let ans_ty = Ptr (Namedt id) in
+  (* let ans_ty = cmp_ty ct @@ TRef (RStruct id) in  *)
   let struct_ty = Ptr I64 in
+
   let new_id = gensym "raw_"^id in 
+
   let final_id = gensym id in 
   ans_ty, Id final_id, lift
     [ new_id, Call(struct_ty, Gid "oat_malloc", [I64, Const size])  
@@ -337,6 +369,7 @@ let rec cmp_exp (tc : TypeCtxt.t) (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.ope
       ; tmp_id, Bitcast(ll_ty, ll_op, ll_f_ty)
       ; "", Store(ll_f_ty, Id tmp_id, Id ptr_id)]      
     ) [] l in 
+
     st_ty, st_op, st_code >@ strm
 
   | Ast.Proj (e, id) ->
@@ -493,7 +526,12 @@ let cmp_function_ctxt (tc : TypeCtxt.t) (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
         let name = fdecl.name in
         let args = fdecl.args in
         let ll_ty_list = List.map (fun (x,_) -> cmp_ty tc x) args in
-        let ret_ty = cmp_ret_ty tc fdecl.rtyp in
+        let ret_ty = 
+        begin match fdecl.rtyp with
+        | Ast.RetVoid -> Void
+        | Ast.RetVal (Ast.TRef (Ast.RStruct i)) -> Ptr (Namedt i)
+        | _ -> cmp_ret_ty tc fdecl.rtyp
+        end in
         let fun_ty = Ll.Fun (ll_ty_list, ret_ty) in
         Ctxt.add ctxt name (Ptr fun_ty, Gid name)
       | _ -> ctxt
@@ -530,6 +568,7 @@ let cmp_global_ctxt (tc : TypeCtxt.t) (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
  *)
 let cmp_fdecl (tc : TypeCtxt.t) (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
   let {rtyp; args; body} = f.elt in
+
   let add_arg (s_typ, s_id) (c,code,args) =
     let ll_id = gensym s_id in
     let ll_ty = cmp_ty tc s_typ in
@@ -543,6 +582,7 @@ let cmp_fdecl (tc : TypeCtxt.t) (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.g
   in
   let c, args_code, args = List.fold_right add_arg args (c,[],[]) in
   let ll_rty = cmp_ret_ty tc rtyp in
+
   let block_code = cmp_block tc c ll_rty body in
   let argtys, param = List.split args in
   let fty = (argtys, ll_rty) in
@@ -581,8 +621,15 @@ let rec cmp_gexp c (tc : TypeCtxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.
 
   (* TASK: Complete this code that generates the global initializers for a struct. *)
   | CStruct (id, cs) ->
-    failwith "TODO: handle global struct declarations"                             
-
+    let el_gdecls, gs = List.fold_right
+        (fun cst (el_gdecls, gs) ->
+           let gd, gs' = cmp_gexp c tc cst.cfinit in
+           gd::el_gdecls, gs' @ gs) cs ([], [])
+    in
+    let ll_struct_ty = Namedt id in 
+    let gid = gensym "global_struct" in
+    let g_struct = GStruct el_gdecls in
+    (Ptr ll_struct_ty, GGid gid), (gid, (ll_struct_ty, g_struct))::gs
 
   | _ -> failwith "bad global initializer"
 
@@ -605,7 +652,6 @@ let tctxt_to_tdecls c =
 
 (* Compile a OAT program to LLVMlite *)
 let cmp_prog (p:Ast.prog) : Ll.prog =
-
   let tc = get_struct_defns p in
 
   (* add built-in functions to context *)
@@ -614,7 +660,6 @@ let cmp_prog (p:Ast.prog) : Ll.prog =
       Ctxt.empty builtins
   in
   let fc = cmp_function_ctxt tc init_ctxt p in
-
   (* build global variable context *)
   let c = cmp_global_ctxt tc fc p in
 
@@ -623,6 +668,7 @@ let cmp_prog (p:Ast.prog) : Ll.prog =
     List.fold_right (fun d (fs, gs) ->
         match d with
         | Ast.Gvdecl { elt=gd } -> 
+
            let ll_gd, gs' = cmp_gexp c tc gd.init in
            (fs, (gd.name, ll_gd)::gs' @ gs)
         | Ast.Gfdecl fd ->

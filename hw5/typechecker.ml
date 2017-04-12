@@ -214,6 +214,7 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
       let new_c = Tctxt.add_local tc id exp_ty in
      (new_c, NoReturn)
     end
+
   | Ast.Ret e_opt -> 
     begin match e_opt with
     | Some ex -> 
@@ -317,7 +318,7 @@ and typecheck_ref (l : 'a Ast.node) (tc : Tctxt.t) (t : Ast.rty) : unit =
     let typ_opt = Tctxt.lookup_struct_option id tc in
     begin match typ_opt with
       | Some field_list -> 
-        List.iter (fun f -> typecheck_ty l tc f.ftyp) field_list
+        ()(* List.iter (fun f -> typecheck_ty l tc f.ftyp) field_list *)
       | None -> type_error l "not in context"
     end
   | Ast.RArray ty -> typecheck_ty l tc ty
