@@ -258,14 +258,14 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
       | Some s2 -> let c, _ = typecheck_stmt l2_ctxt s2 to_ret in c
       | None -> l2_ctxt
       end in
-      let st_ty = typecheck_block l3_ctxt blk to_ret in
+      let _ = typecheck_block l3_ctxt blk to_ret in
       (tc, NoReturn)
     | _ -> type_error s "Expression must be of type bool"
     end
   | Ast.While (e_n, blk) -> 
     begin match typecheck_exp tc e_n with
     | TBool ->
-      let st_ty = typecheck_block tc blk to_ret in
+      let _ = typecheck_block tc blk to_ret in
       (tc, NoReturn)
     | _ -> type_error s "Expression must be of type bool"
     end
@@ -350,7 +350,6 @@ let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
 
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let rtyp = f.rtyp in
-  let name = f.name in
   let args = f.args in
   let body = f.body in
   let _ = typecheck_ret_ty rtyp l tc in
