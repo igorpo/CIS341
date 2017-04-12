@@ -2,14 +2,30 @@ struct Node {
 	string val;
 	Node next;
 	bool visited;
+	Queue neighbors;
 	bool hasNext
 }
 
-Node newNode(string v) {
-	return new Node {val=v; next=Node null; hasNext=false; visited=false};
+Node getIthInQueue(int i, Queue q) {
+	var tmp = q.head;
+	if (i + 1 == q.size) {
+		return q.tail;
+	}
+	while (tmp.hasNext) {
+		if (i == 0) {
+			return tmp;
+		}
+		tmp = tmp.next;
+		i = i - 1;
+	}
+	return newNode("ERROR");
 }
 
-void print_node(Node n) {
+Node newNode(string v) {
+	return new Node {val=v; next=Node null; hasNext=false; visited=false; neighbors=newEmptyQueue()};
+}
+
+void printNode(Node n) {
 	print_string(n.val);
 	return;
 }
@@ -26,6 +42,15 @@ Queue newEmptyQueue() {
 
 bool isEmpty(Queue q) {
 	return q.size == 0;	
+}
+
+void printNeighbors(Node n) {
+	var s = n.neighbors.size;
+	for (var i = 0; i < s; i = i + 1;) {
+		var x = getIthInQueue(i, n.neighbors);
+		printNode(x);
+	}
+	return;
 }
 
 void enqueue(Queue q, Node n) {
@@ -52,22 +77,92 @@ Node dequeue(Queue q) {
 	return tmp;
 }
 
+void addNeighbor(Node tgt, Node toAdd) {
+	enqueue(tgt.neighbors, toAdd);
+	return;
+}
+
 void bfs(Node start) {
+	var q = newEmptyQueue();
+	start.visited = true;
+	enqueue(q, start);
+	while (!isEmpty(q)) {
+		var curr = dequeue(q);
+		print_string("DEQUEUED: ");
+		printNode(curr);
+		print_string("\n");
+		print_string("Neighbors: ");
+		printNeighbors(curr);
+		print_string("\n");
+		var s = curr.neighbors.size;
+
+		for (var i = 0; i < s; i = i + 1;) {
+			var n = getIthInQueue(i, curr.neighbors);
+			if (!(n.visited)) {
+				n.visited = true;
+				enqueue(q, n);
+			}
+		}
+		print_string("\n-----------------------BFS ROUND OVER-------------------------\n");
+	}
 	return;
 }
 
 int program (int argc, string[] argv) {
-	var q = newEmptyQueue();
-	var n = newNode("hi");
-	var n2 = newNode("again");
-	var n3 = newNode("hmm");
-	enqueue(q, n);
-	enqueue(q, n2);
-	var d1 = dequeue(q);
-	print_node(d1);
-	var d2 = dequeue(q);
-	print_node(d2);
-	enqueue(q, n3);
-	print_node(dequeue(q));
+
+	var there = newNode("there ");
+	var should = newNode("should ");
+	var be = newNode("be ");
+	var better = newNode("better ");
+	var food = newNode("food ");
+	var options = newNode("options ");
+	var on = newNode("on ");
+	var campus = newNode("campus");
+
+	addNeighbor(there, should);
+	addNeighbor(there, be);
+	addNeighbor(there, better);
+	printNeighbors(there);
+	print_string("\n----\n");
+
+	addNeighbor(should, there);
+	addNeighbor(should, food);
+	printNeighbors(should);
+	print_string("\n----\n");
+
+	addNeighbor(be, there);
+	addNeighbor(be, better);
+	printNeighbors(be);
+	print_string("\n----\n");
+
+	addNeighbor(better, there);
+	addNeighbor(better, be);
+	addNeighbor(better, options);
+	printNeighbors(better);
+	print_string("\n----\n");
+
+	addNeighbor(food, should);
+	addNeighbor(food, options);
+	printNeighbors(food);
+	print_string("\n----\n");
+
+	addNeighbor(options, food);
+	addNeighbor(options, better);
+	addNeighbor(options, on);
+	addNeighbor(options, campus);
+	printNeighbors(options);
+	print_string("\n----\n");
+
+	addNeighbor(on, options);
+	printNeighbors(on);
+	print_string("\n----\n");
+
+	addNeighbor(campus, options);
+	printNeighbors(campus);
+	print_string("\n----\n");
+
+	print_string("\n----BEGINNING BFS----\n");
+
+	bfs(there);
 	return 0;
 }

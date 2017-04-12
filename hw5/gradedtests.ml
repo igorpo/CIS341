@@ -283,7 +283,8 @@ let our_test = [
     (* ("hw5programs/compile_global_struct.oat", "", "254"); *)
     (* ("hw5programs/compile_global_struct_fptr.oat", "", "20"); *)
     (* ("hw5programs/compile_various_fields.oat", "", "hello253");  *)
-    ("hw5programs/bfs2.oat", "", "hiagainhmm0");
+    ("hw5programs/bfs2.oat", "", "there should be better food options on campus0");
+    (* ("hw5programs/bfs2.oat", "", "hiagainhmm0"); *)
   ]
 
 let hw5_tests : suite =
