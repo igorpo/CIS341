@@ -1,0 +1,123 @@
+struct Node {
+	string val;
+  	Node next;
+  	Queue neighbors;
+  	bool visited;
+  	bool isDummy
+}
+
+struct Queue {
+	Node head;
+	Node end;
+	int size
+}
+
+
+Queue enqueue(Queue queue, Node n) {
+	if (queue.size == 0) {
+		queue.head = n;
+		queue.end = n;
+		queue.size = 1;
+	} else {
+		queue.end.next = n;
+		queue.end = n;
+		n.next = Node null;
+		queue.size = queue.size + 1;
+	}
+	return queue;
+}
+
+Queue dequeue(Queue queue) {
+	if (isEmpty(queue)) {
+		var dummyNode = new Node {val=""; next=Node null; neighbors=Queue null; visited=false; isDummy=true};
+		return enqueue(queue, dummyNode);
+	}
+
+	var tmp = queue.head;
+	queue.head = queue.head.next;
+	queue.size = queue.size - 1;
+	return queue;
+}
+
+Queue getNeighbors(Node n) {
+	if (n.isDummy) {
+		var dummyNode = new Node {val=""; next=Node null; neighbors=Queue null; visited=false; isDummy=true};
+		var dummyQueue = new Queue {head=dummyNode; end=dummyNode; size=0};
+		return dummyQueue;		
+	}
+	
+	return n.neighbors;
+}
+
+bool isEmpty(Queue queue) {
+	return queue.size == 0;
+}
+
+void bfs(Node start) {
+	var frontier = new Queue {head=start; end=start; size=1};
+	start.visited = true;
+	var node = Node null;
+	var neighbors = Queue null;
+	var neighbor = Node null;
+	while (!isEmpty(frontier)) {
+		frontier = dequeue(frontier);
+		node = frontier.head;
+		neighbors = getNeighbors(node);
+		var size = neighbors.size;
+		for (var i = 0; i < size; i = i + 1;) {
+			neighbors = dequeue(neighbors);
+			neighbor = neighbors.head;
+			if (!(neighbor.visited)) {
+				neighbor.visited = true;
+				print_string(neighbor.val);
+				frontier = enqueue(frontier, neighbor);
+			}
+		} 
+	}
+
+	return;
+}
+
+int program (int argc, string[] argv) {
+	var dummyNode = new Node {val=""; next=Node null; neighbors=Queue null; visited=false; isDummy=true};
+	var dummyQueue = new Queue {head=dummyNode; end=dummyNode; size=0};
+	var there = new Node {val="there"; next=dummyNode; neighbors=dummyQueue; visited=false; isDummy=false};
+	var should = new Node {val="should"; next=dummyNode; neighbors=dummyQueue; visited=false; isDummy=false};
+	var be = new Node {val="be"; next=dummyNode; neighbors=dummyQueue; visited=false; isDummy=false};
+	var better = new Node {val="better"; next=dummyNode; neighbors=dummyQueue; visited=false; isDummy=false};
+	var food = new Node {val="food"; next=dummyNode; neighbors=dummyQueue; visited=false; isDummy=false};
+	var options = new Node {val="options"; next=dummyNode; neighbors=dummyQueue; visited=false; isDummy=false};
+	var on = new Node {val="on"; next=dummyNode; neighbors=dummyQueue; visited=false; isDummy=false};
+	var campus = new Node {val="campus"; next=dummyNode; neighbors=dummyQueue; visited=false; isDummy=false};
+
+	there.neighbors = enqueue(there.neighbors, should);
+	there.neighbors = enqueue(there.neighbors, be);
+	there.neighbors = enqueue(there.neighbors, better);
+
+	should.neighbors = enqueue(should.neighbors, there);
+	should.neighbors = enqueue(should.neighbors, food);
+
+	be.neighbors = enqueue(be.neighbors, there);
+	be.neighbors = enqueue(be.neighbors, better);
+
+	better.neighbors = enqueue(better.neighbors, there);
+	better.neighbors = enqueue(better.neighbors, be);
+	better.neighbors = enqueue(better.neighbors, options);
+
+	food.neighbors = enqueue(food.neighbors, should);
+	food.neighbors = enqueue(food.neighbors, options);
+
+	options.neighbors = enqueue(options.neighbors, food);
+	options.neighbors = enqueue(options.neighbors, better);
+	options.neighbors = enqueue(options.neighbors, on);
+	options.neighbors = enqueue(options.neighbors, campus);
+
+	on.neighbors = enqueue(on.neighbors, options);
+
+	campus.neighbors = enqueue(campus.neighbors, options);
+	bfs(there);
+	return 0;
+}
+
+
+

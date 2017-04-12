@@ -1,0 +1,73 @@
+struct Node {
+	string val;
+	Node next;
+	bool visited;
+	bool hasNext
+}
+
+Node newNode(string v) {
+	return new Node {val=v; next=Node null; hasNext=false; visited=false};
+}
+
+void print_node(Node n) {
+	print_string(n.val);
+	return;
+}
+
+struct Queue {
+	Node head;
+	Node tail;
+	int size
+}
+
+Queue newEmptyQueue() {
+	return new Queue {head=Node null; tail=Node null; size=0};
+}
+
+bool isEmpty(Queue q) {
+	return q.size == 0;	
+}
+
+void enqueue(Queue q, Node n) {
+	if (q.size == 0) {
+		q.head = n;
+		q.tail = n;
+	} else {
+		q.tail.hasNext = true;
+		q.tail.next = n;
+		q.tail = n;
+	}
+	q.size = q.size + 1;
+	n.hasNext = false;
+	return;
+}
+
+Node dequeue(Queue q) {
+	if (isEmpty(q)) {
+		return newNode("");
+	}
+	var tmp = q.head;
+	q.head = tmp.next;
+	q.size = q.size - 1;
+	return tmp;
+}
+
+void bfs(Node start) {
+	return;
+}
+
+int program (int argc, string[] argv) {
+	var q = newEmptyQueue();
+	var n = newNode("hi");
+	var n2 = newNode("again");
+	var n3 = newNode("hmm");
+	enqueue(q, n);
+	enqueue(q, n2);
+	var d1 = dequeue(q);
+	print_node(d1);
+	var d2 = dequeue(q);
+	print_node(d2);
+	enqueue(q, n3);
+	print_node(dequeue(q));
+	return 0;
+}
