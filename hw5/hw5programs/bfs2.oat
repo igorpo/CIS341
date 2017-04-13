@@ -56,14 +56,13 @@ void printNeighbors(Node n) {
 void enqueue(Queue q, Node n) {
 	if (q.size == 0) {
 		q.head = n;
-		q.tail = n;
 	} else {
 		q.tail.hasNext = true;
 		q.tail.next = n;
-		q.tail = n;
 	}
 	q.size = q.size + 1;
 	n.hasNext = false;
+	q.tail = n;
 	return;
 }
 
@@ -127,22 +126,42 @@ int program (int argc, string[] argv) {
 
 	addNeighbor(should, there);
 	addNeighbor(should, food);
+	printNeighbors(there);
+	print_string("\n----\n");
 	printNeighbors(should);
 	print_string("\n----\n");
 
 	addNeighbor(be, there);
 	addNeighbor(be, better);
+	printNeighbors(there);
+	print_string("\n----\n");
+	printNeighbors(should);
+	print_string("\n----\n");
 	printNeighbors(be);
 	print_string("\n----\n");
 
 	addNeighbor(better, there);
 	addNeighbor(better, be);
 	addNeighbor(better, options);
+	printNeighbors(there);
+	print_string("\n----\n");
+	printNeighbors(should);
+	print_string("\n----\n");
+	printNeighbors(be);
+	print_string("\n----\n");
 	printNeighbors(better);
 	print_string("\n----\n");
 
 	addNeighbor(food, should);
 	addNeighbor(food, options);
+	printNeighbors(there);
+	print_string("\n----\n");
+	printNeighbors(should);
+	print_string("\n----\n");
+	printNeighbors(be);
+	print_string("\n----\n");
+	printNeighbors(better);
+	print_string("\n----\n");
 	printNeighbors(food);
 	print_string("\n----\n");
 
@@ -150,15 +169,16 @@ int program (int argc, string[] argv) {
 	addNeighbor(options, better);
 	addNeighbor(options, on);
 	addNeighbor(options, campus);
-	printNeighbors(options);
+	printNeighbors(there);
 	print_string("\n----\n");
+	
 
 	addNeighbor(on, options);
-	printNeighbors(on);
+	printNeighbors(there);
 	print_string("\n----\n");
 
 	addNeighbor(campus, options);
-	printNeighbors(campus);
+	printNeighbors(there);
 	print_string("\n----\n");
 
 	print_string("\n----BEGINNING BFS----\n");
