@@ -1,19 +1,32 @@
+global debug = false;
+
 struct Node {
 	string val;
-	Node next;
 	bool visited;
 	Queue neighbors;
 	bool hasNext
 }
 
+struct QNode {
+	Node node;
+	QNode next;
+	bool qhasNext
+}
+
+struct Queue {
+	QNode head;
+	QNode tail;
+	int size
+}
+
 Node getIthInQueue(int i, Queue q) {
 	var tmp = q.head;
 	if (i + 1 == q.size) {
-		return q.tail;
+		return q.tail.node;
 	}
-	while (tmp.hasNext) {
+	while (tmp.qhasNext) {
 		if (i == 0) {
-			return tmp;
+			return tmp.node;
 		}
 		tmp = tmp.next;
 		i = i - 1;
@@ -22,7 +35,11 @@ Node getIthInQueue(int i, Queue q) {
 }
 
 Node newNode(string v) {
-	return new Node {val=v; next=Node null; hasNext=false; visited=false; neighbors=newEmptyQueue()};
+	return new Node {val=v; hasNext=false; visited=false; neighbors=newEmptyQueue()};
+}
+
+QNode newQNode(Node n) {
+	return new QNode {node=n; next=QNode null; qhasNext=false};
 }
 
 void printNode(Node n) {
@@ -30,39 +47,44 @@ void printNode(Node n) {
 	return;
 }
 
-struct Queue {
-	Node head;
-	Node tail;
-	int size
+Queue newEmptyQueue() {
+	return new Queue {head=QNode null; tail=QNode null; size=0};
 }
 
-Queue newEmptyQueue() {
-	return new Queue {head=Node null; tail=Node null; size=0};
-}
 
 bool isEmpty(Queue q) {
 	return q.size == 0;	
 }
 
 void printNeighbors(Node n) {
+	printNeighborsDebug(n, debug);
+	return;
+}
+
+void printNeighborsDebug(Node n, bool d) {
+	if (!d) {
+		return;
+	}
 	var s = n.neighbors.size;
 	for (var i = 0; i < s; i = i + 1;) {
 		var x = getIthInQueue(i, n.neighbors);
 		printNode(x);
 	}
+	print_string("\n");
 	return;
 }
 
 void enqueue(Queue q, Node n) {
+	var node = newQNode(n);
 	if (q.size == 0) {
-		q.head = n;
+		q.head = node;
 	} else {
-		q.tail.hasNext = true;
-		q.tail.next = n;
+		q.tail.qhasNext = true;
+		q.tail.next = node;
 	}
 	q.size = q.size + 1;
-	n.hasNext = false;
-	q.tail = n;
+	node.qhasNext = false;
+	q.tail = node;
 	return;
 }
 
@@ -73,7 +95,7 @@ Node dequeue(Queue q) {
 	var tmp = q.head;
 	q.head = tmp.next;
 	q.size = q.size - 1;
-	return tmp;
+	return tmp.node;
 }
 
 void addNeighbor(Node tgt, Node toAdd) {
@@ -87,14 +109,8 @@ void bfs(Node start) {
 	enqueue(q, start);
 	while (!isEmpty(q)) {
 		var curr = dequeue(q);
-		print_string("DEQUEUED: ");
 		printNode(curr);
-		print_string("\n");
-		print_string("Neighbors: ");
-		printNeighbors(curr);
-		print_string("\n");
 		var s = curr.neighbors.size;
-
 		for (var i = 0; i < s; i = i + 1;) {
 			var n = getIthInQueue(i, curr.neighbors);
 			if (!(n.visited)) {
@@ -102,8 +118,16 @@ void bfs(Node start) {
 				enqueue(q, n);
 			}
 		}
-		print_string("\n-----------------------BFS ROUND OVER-------------------------\n");
 	}
+	return;
+}
+
+
+void print_debug(string msg) {
+	if (!debug) {
+		return;
+	}
+	print_string(msg);
 	return;
 }
 
@@ -121,68 +145,30 @@ int program (int argc, string[] argv) {
 	addNeighbor(there, should);
 	addNeighbor(there, be);
 	addNeighbor(there, better);
-	printNeighbors(there);
-	print_string("\n----\n");
-
+	
 	addNeighbor(should, there);
 	addNeighbor(should, food);
-	printNeighbors(there);
-	print_string("\n----\n");
-	printNeighbors(should);
-	print_string("\n----\n");
-
+	
 	addNeighbor(be, there);
 	addNeighbor(be, better);
-	printNeighbors(there);
-	print_string("\n----\n");
-	printNeighbors(should);
-	print_string("\n----\n");
-	printNeighbors(be);
-	print_string("\n----\n");
+	
 
 	addNeighbor(better, there);
 	addNeighbor(better, be);
 	addNeighbor(better, options);
-	printNeighbors(there);
-	print_string("\n----\n");
-	printNeighbors(should);
-	print_string("\n----\n");
-	printNeighbors(be);
-	print_string("\n----\n");
-	printNeighbors(better);
-	print_string("\n----\n");
-
+	
 	addNeighbor(food, should);
 	addNeighbor(food, options);
-	printNeighbors(there);
-	print_string("\n----\n");
-	printNeighbors(should);
-	print_string("\n----\n");
-	printNeighbors(be);
-	print_string("\n----\n");
-	printNeighbors(better);
-	print_string("\n----\n");
-	printNeighbors(food);
-	print_string("\n----\n");
-
+	
 	addNeighbor(options, food);
 	addNeighbor(options, better);
 	addNeighbor(options, on);
 	addNeighbor(options, campus);
-	printNeighbors(there);
-	print_string("\n----\n");
 	
-
 	addNeighbor(on, options);
-	printNeighbors(there);
-	print_string("\n----\n");
-
+	
 	addNeighbor(campus, options);
-	printNeighbors(there);
-	print_string("\n----\n");
-
-	print_string("\n----BEGINNING BFS----\n");
-
+	
 	bfs(there);
-	return 0;
+	return 0; 	
 }
