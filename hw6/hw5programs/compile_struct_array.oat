@@ -1,0 +1,13 @@
+struct Test {
+  int[] xs;
+  int y;
+  int[] zs
+}
+
+global arr_x = int[] {3,4,5};
+global arr_z = int[] {4,5,6};
+
+int program(int argc, string[] argv) {
+  var t = new Test {xs=arr_x; y=3; zs=arr_z};
+  return t.xs[0] * t.zs[1];
+}

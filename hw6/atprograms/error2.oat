@@ -1,0 +1,3 @@
+string f(int x, int x) {
+  return "str";
+}

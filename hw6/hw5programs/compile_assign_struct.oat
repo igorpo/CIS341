@@ -1,0 +1,12 @@
+struct Point {
+  int x;
+  int y
+}
+
+int program(int argc, string[] argv) {
+  var p = new Point {x = 3; y = 4 };
+  p.x = 5;
+  p.y = p.x + p.y + 3;
+  p.x = p.y + 4;
+  return p.x;
+}

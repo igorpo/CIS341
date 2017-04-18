@@ -1,0 +1,7 @@
+int program (int argc, string[] argv) {
+  var a = new int[]{126,125,124,123,122,121,120,119,118,117};
+  print_string (string_of_array(a));
+  return 0;  
+}
+
+

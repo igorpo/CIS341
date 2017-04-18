@@ -1,0 +1,2 @@
+int j = 0;
+int[] x = new int[2]{ i => j}; /* global initializers must be closed */

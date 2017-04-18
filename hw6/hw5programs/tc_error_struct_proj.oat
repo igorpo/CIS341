@@ -1,0 +1,12 @@
+struct T {
+  int f
+}
+
+struct G {
+  int g
+}
+
+int program(int argc, string[] argv) {
+  var x = new T { f = 3 };
+  return x.g;
+}

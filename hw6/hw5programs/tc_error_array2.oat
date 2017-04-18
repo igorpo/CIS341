@@ -1,0 +1,5 @@
+int program(int argc, string[] argv) {
+  var arr2 = new bool[] { true, false };
+  var arr = new int[arr2[0]];
+  return arr[0];
+}

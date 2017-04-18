@@ -1,0 +1,3 @@
+int f(int i) {return i;}
+
+int g(int j) {return g(true);}

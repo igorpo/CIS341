@@ -1,0 +1,9 @@
+struct T {
+  int f1;
+  int f2
+}
+
+int program(int argc, string[] argv) {
+  var x = new T { f1 = 3; f2 = 4 };
+  return x.f1;
+}

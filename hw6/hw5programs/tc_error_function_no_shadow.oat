@@ -1,0 +1,12 @@
+int add(int arg1, int arg2) {
+  return arg1 + arg2;
+}
+
+bool foo(int arg2) {
+  return true;
+}
+
+int program(int argc, string[] argv) {
+  var add = foo;
+  return add(3, 4);
+}

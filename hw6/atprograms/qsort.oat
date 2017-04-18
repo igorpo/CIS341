@@ -1,0 +1,53 @@
+
+void quick_sort( int[] a, int l, int r)
+{
+   var j=0;
+
+   if( l < r ) 
+   {
+      /* divide and conquer */
+      j = partition( a, l, r);
+      quick_sort( a, l, j-1);
+      quick_sort( a, j+1, r);
+   }
+	
+   return;
+}
+
+int partition( int[] a, int l, int r) {
+   var pivot=a[l];
+   var i =l;
+   var j = r+1;
+   var t=0; 
+   var done = 0;
+     	
+   while(done==0)
+   {
+      i = i + 1;
+      while( a[i] <= pivot & i <= r ) {
+        i = i + 1;
+      }	
+      j = j - 1;
+      while( a[j] > pivot ) {
+        j = j - 1;
+      }	
+      if( i >= j ) { done=1; }
+      if (done==0) {
+        t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+   }
+   t = a[l]; a[l] = a[j]; a[j] = t;
+   return j;
+}
+
+int program (int argc, string[] argv) {
+
+  var a = new int[]{ 107, 112, 121, 102, 123, 115, 104, 111, 109};
+
+  print_string (string_of_array (a));
+  quick_sort( a, 0, 8);
+  print_string (string_of_array (a));  
+
+  return 255;
+}
+

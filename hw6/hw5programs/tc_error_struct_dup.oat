@@ -1,0 +1,8 @@
+struct X {
+  int y;
+  int y
+}
+
+int program(int argc, string[] argv) {
+  return 0;
+}

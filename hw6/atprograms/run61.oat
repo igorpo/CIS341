@@ -1,0 +1,6 @@
+global s = "341";
+
+int program(int argc, string[] argv) {
+  print_string(s);
+  return 0;
+}

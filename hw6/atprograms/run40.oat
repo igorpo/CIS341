@@ -1,0 +1,10 @@
+global i=8;
+int f() {
+  var j=0;
+  j=g();
+  return j;
+}
+int g() {return i;}
+int program(int argc, string[] argv) {
+  return f();
+}

@@ -1,0 +1,7 @@
+int program(int argc, string[] argv) {
+  if (true) {
+    return 0;
+  } else {
+    var x = 3;
+  }
+}

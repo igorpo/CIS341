@@ -1,0 +1,12 @@
+int f1() { return f2(); }
+int f2() { return f3(); }
+int f3() { return f4(); }
+int f4() { return f5(); }
+int f5() { return f6(); }
+int f6() { return f7(); }
+int f7() { return f8(); }
+int f8() { return f9(); }
+int f9() { return 31; }
+int program (int argc, string[] argv) {
+  return f1();
+}

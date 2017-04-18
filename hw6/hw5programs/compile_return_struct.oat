@@ -1,0 +1,17 @@
+struct Pair {
+  bool x;
+  bool y
+}
+
+Pair create_pair(bool a, bool b) {
+  return new Pair {x = a; y = b};
+}
+
+int program(int argc, string[] argv) {
+  var p = create_pair(true, false);
+  if (p.x & p.y) {
+    return 1;
+  } else {
+    return 0;
+  }
+}

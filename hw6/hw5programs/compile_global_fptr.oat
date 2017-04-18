@@ -1,0 +1,9 @@
+int add(int x, int y) {
+  return x + y;
+}
+
+global x = add;
+
+int program(int argc, string[] argv) {
+  return x(3, 4);
+}

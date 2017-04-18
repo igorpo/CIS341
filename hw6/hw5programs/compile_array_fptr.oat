@@ -1,0 +1,7 @@
+int add(int x, int y) { return x + y; }
+int sub(int x, int y) { return x - y; }
+
+int program(int argc, string[] argv) {
+  var ops = new ((int, int) -> int) [] { add, sub };
+  return ops[0](1, 1);
+}

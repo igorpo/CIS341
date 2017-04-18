@@ -1,0 +1,6 @@
+global arr = null; 
+
+int program (int argc, string[] argv) {
+  arr = new {17,42};
+  return arr[1];
+}

@@ -1,0 +1,5 @@
+void f() {
+  int x = 0;
+  int x = 0;
+  return;
+}

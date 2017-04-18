@@ -1,0 +1,9 @@
+int add(int x, int y) {
+  return x + y;
+}
+
+int program(int argc, string[] argv) {
+  var plus = add;
+  var loc_add = plus;
+  return loc_add(2, 3);
+}

@@ -1,0 +1,9 @@
+int print(int x) {
+  print_int(x);
+  return x;
+}
+
+int program(int argc, string[] argv) {
+  print(argc);
+  return 0;
+}

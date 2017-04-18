@@ -1,0 +1,11 @@
+int program(int argc, string[] argv) {
+  var x = array_of_string("");
+  var y = string_of_array(x);
+  var z = length_of_string(y);
+  var a = string_of_int(3);
+  var b = string_cat("hello", "world");
+  print_string(b);
+  print_int(3);
+  print_bool(true);
+  return z;
+}

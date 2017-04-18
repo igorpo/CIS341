@@ -1,0 +1,11 @@
+global str = "hello"; 
+
+int program (int argc, string[] argv) {
+  var arr = array_of_string (str);
+  var s = 0;
+  for (var i=0; i<5; i=i+1;) {
+    s = s + arr[i];
+  }
+  print_int(s);
+  return s; 
+}

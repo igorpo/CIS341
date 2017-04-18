@@ -1,0 +1,10 @@
+int f(int x, int y) {
+  return x + y;
+}
+
+global x = f;
+global y = x;
+
+int program(int argc, string[] argv) {
+  return y(3,4);
+}

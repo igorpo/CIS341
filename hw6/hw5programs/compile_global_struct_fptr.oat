@@ -1,0 +1,17 @@
+struct Color {
+  int red;
+  int green;
+  int blue;
+  (Color) -> Color f
+}
+
+Color rot(Color c1) {
+  var c2 = new Color{ red = c1.green; green = c1.blue; blue = c1.red; f = c1.f };
+  return c2;
+}
+
+global white = Color { red = 10; green = 20; blue = 30 ; f = rot};
+
+int program (int argc, string[] argv) {
+  return white.f(white).red;
+}

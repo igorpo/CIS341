@@ -1,0 +1,7 @@
+void f() {
+  return 3;
+}
+
+int program(int argc, string[] argv) {
+  return 0;
+}

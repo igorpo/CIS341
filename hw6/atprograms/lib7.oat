@@ -1,0 +1,11 @@
+int program (int argc, string[] argv) {
+  var arr1 = new int[]{111,112,113,114,115};
+  var str = string_of_array (arr1);
+  var arr2 = array_of_string (str);
+  var s = 0;
+  for (var i=0; i<5; i=i+1;) {
+    s = s + arr2[i];
+  }
+  return s; 
+} 
+

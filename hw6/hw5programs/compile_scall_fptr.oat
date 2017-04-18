@@ -1,0 +1,10 @@
+void inc_first(int[] x) {
+  x[0] = x[0] + 1;
+  return;
+}
+
+int program(int argc, string[] argv) {
+  var x = new int[] {3, 4, 5};
+  inc_first(x);
+  return x[0];
+}
