@@ -71,7 +71,27 @@ module type FACT =
 module Make (Fact : FACT) (Graph : DFA_GRAPH with type fact := Fact.t) =
   struct
 
+    let rec solver workset g = 
+      begin match Graph.NodeS.is_empty workset with 
+      | true -> g
+      | false -> 
+        let elt = Graph.NodeS.choose workset in 
+        let pre = Graph.NodeS.elements (Graph.preds g elt) in 
+        let pre_facts = List.map (fun p -> Graph.find_fact g p) pre in 
+        let cmb = Fact.combine pre_facts in 
+        let flow_out = Graph.flow g elt cmb in 
+        let new_workset = Graph.NodeS.remove elt workset in 
+        if (Fact.compare flow_out (Graph.find_fact g elt)) <> 0 then 
+          let succ = Graph.succs g elt in 
+          let new_new_workset = Graph.NodeS.union new_workset succ in 
+          let g' = Graph.add_fact elt flow_out g in 
+          solver new_new_workset g'
+        else 
+          solver new_workset g
+      end
+
     let solve (g:Graph.t) : Graph.t =
-      failwith "TODO HW6: Solver.solve unimplemented"
+      let nodes = Graph.nodes g in 
+      solver nodes g
   end
 

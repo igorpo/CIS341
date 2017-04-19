@@ -48,10 +48,13 @@ let terminator_uses (t:terminator) : UidS.t = uids_of_ops (terminator_ops t)
    (In our representation, there is one flow function for instructions
    and another for terminators.                                               *)
 let insn_flow (u,i:uid * insn) (out:UidS.t) : UidS.t =
-failwith "TODO HW6: Liveness.insn_flow not implemented"
+  let insn_u = insn_uses i in 
+  let diff = UidS.remove u out in 
+  UidS.union insn_u diff 
 
 let terminator_flow (t:terminator) (out:UidS.t) : UidS.t =
-failwith "TODO HW6: Liveness.terminator_flow not implemented"
+  let term_u = terminator_uses t in 
+  UidS.union out term_u 
 
 module Fact =
   struct
