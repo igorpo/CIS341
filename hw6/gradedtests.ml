@@ -143,7 +143,7 @@ let assert_quality fn ll_ast =
   let _ = Platform.verb @@
     Printf.sprintf "opt: %5d %5d  none: %5d %5d = score %5d for %s\n" score_opt size_opt score_default size_default score fn
   in
-  if score >= 0 then () else failwith @@ Printf.sprintf "default better than opt score = %d" score
+  if score > 0 then () else failwith @@ Printf.sprintf "default better than opt score = %d" score
   
 
 let assert_quality_ll fn () = 
