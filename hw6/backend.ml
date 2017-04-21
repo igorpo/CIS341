@@ -566,28 +566,46 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
                         |> remove (Alloc.LReg Rcx)) in
   let n_spill = ref 0 in
   let next_loc live_set lo =
-    let used = List.fold_left (fun reg_set _uid -> 
-      begin match List.assoc _uid lo with
-      | Alloc.LStk l -> LocSet.add (Alloc.LStk l) reg_set
-      | _ -> reg_set
-      end
-    ) LocSet.empty (LocSet.elements live_set) in
+    Printf.printf "Size of live_set %d\n" (UidSet.cardinal live_set);
+    let used = UidSet.fold (fun _uid reg_set -> 
+    try
+      let _loc = List.assoc _uid lo in
+      Printf.printf "Found taken one\n";
+      LocSet.add _loc reg_set
+    with
+      Not_found -> Printf.printf "Found free one\n"; reg_set
+    ) live_set LocSet.empty in
     let available = LocSet.diff !pal used in
+    Printf.printf "Size of available %d\n" (LocSet.cardinal available);
     if LocSet.is_empty available
-    then (incr n_spill; Alloc.LStk (- !n_spill))
+    then let ret = (incr n_spill; Alloc.LStk (- !n_spill)) in Printf.printf "Spill!\n"; ret
     else (let l = LocSet.choose available in
           pal := LocSet.remove l !pal; l)
   in
+
+  let next_loc_simple () =
+    if LocSet.is_empty !pal
+    then (incr n_spill; Alloc.LStk (- !n_spill))
+    else (let l = LocSet.choose !pal in
+          pal := LocSet.remove l !pal; l)
+  in
+
+
   let lo =
     fold_fdecl
-      (fun lo (uid1, _) -> 
-        let live_set = live uid1 in
-        (uid1, (next_loc live_set lo))::lo) (* defines uid *)
+      (fun lo (x, _) -> 
+        (x, (next_loc_simple()))::lo) 
+      
       (fun lo l -> (l, Alloc.LLbl (Platform.mangle l))::lo)
+      
       (fun lo (uid2, i) ->
+        let live_set = live uid2 in
         if insn_assigns i 
-        then (uid2, next_loc live_set lo)::lo
+        then
+         let ret = (uid2, next_loc live_set lo)::lo in 
+         (Printf.printf "insn_assigns i  = true"); ret
         else (uid2, Alloc.LVoid)::lo) (* defines uid *)
+      
       (fun uid3 _ -> uid3) (* defines uid *)
       [] f in
   { uid_loc = (fun x -> List.assoc x lo)

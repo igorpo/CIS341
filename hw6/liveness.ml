@@ -94,5 +94,16 @@ let get_liveness (f : Ll.fdecl) : uid -> UidS.t =
     let lb = Analysis.block_flow_backwards_map
                insn_flow terminator_flow b l_in in
     
-    fun u -> try if l = u then l_in else lb u with Not_found -> f u
+    fun u -> 
+      try 
+        if l = u then 
+          let a = 1 in
+          (* Printf.printf "%s = %s\n" l u; *)
+          l_in
+        else 
+          let a = 1 in
+          (* Printf.printf "%s != %s\n" l u; *)
+          lb u
+      with 
+        Not_found -> f u
   ) (Cfg.nodes cfg) (fun u -> (print_endline u; raise Not_found))
