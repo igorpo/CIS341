@@ -565,6 +565,7 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
                         |> remove (Alloc.LReg Rax) 
                         |> remove (Alloc.LReg Rcx)) in
   let n_spill = ref 0 in
+  
   let next_loc live_set lo =
     Printf.printf "Size of live_set %d\n" (UidSet.cardinal live_set);
     let used = UidSet.fold (fun _uid reg_set -> 
@@ -590,11 +591,20 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
           pal := LocSet.remove l !pal; l)
   in
 
-
   let lo =
     fold_fdecl
+      
+      (* Culprit *)
       (fun lo (x, _) -> 
-        (x, (next_loc_simple()))::lo) 
+        
+        (* is x used? *)
+        (* yes *)
+        (x, (next_loc_simple()))
+        (* no *)
+        (* continue *)
+        ::lo)
+
+         (* check if func args are used, if not, don't bother giving them a loc *)
       
       (fun lo l -> (l, Alloc.LLbl (Platform.mangle l))::lo)
       
@@ -611,6 +621,12 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
   { uid_loc = (fun x -> List.assoc x lo)
   ; spill_bytes = 8 * !n_spill
   }
+
+
+
+
+
+
 
 (* register allocation options ---------------------------------------------- *)
 
