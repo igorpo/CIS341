@@ -567,58 +567,72 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
   let n_spill = ref 0 in
   
   let next_loc live_set lo =
-    Printf.printf "Size of live_set %d\n" (UidSet.cardinal live_set);
+    (* Printf.printf "Size of live_set %d\n" (UidSet.cardinal live_set); *)
     let used = UidSet.fold (fun _uid reg_set -> 
     try
       let _loc = List.assoc _uid lo in
-      Printf.printf "Found taken one\n";
+      (* Printf.printf "Found taken one\n"; *)
       LocSet.add _loc reg_set
     with
-      Not_found -> Printf.printf "Found free one\n"; reg_set
+      Not_found -> (* Printf.printf "Found free one\n"; *) reg_set
     ) live_set LocSet.empty in
     let available = LocSet.diff !pal used in
-    Printf.printf "Size of available %d\n" (LocSet.cardinal available);
+    (* Printf.printf "Size of available %d\n" (LocSet.cardinal available); *)
     if LocSet.is_empty available
     then let ret = (incr n_spill; Alloc.LStk (- !n_spill)) in Printf.printf "Spill!\n"; ret
+    else if LocSet.equal available !pal then
+    Alloc.LReg Rax
     else (let l = LocSet.choose available in
           pal := LocSet.remove l !pal; l)
   in
 
   let next_loc_simple () =
-    if LocSet.is_empty !pal
-    then (incr n_spill; Alloc.LStk (- !n_spill))
-    else (let l = LocSet.choose !pal in
+    if LocSet.is_empty !pal then 
+    (incr n_spill; Alloc.LStk (- !n_spill))
+    else 
+    (let l = LocSet.choose !pal in
           pal := LocSet.remove l !pal; l)
   in
 
   let lo =
     fold_fdecl
-      
-      (* Culprit *)
-      (fun lo (x, _) -> 
-        
-        (* is x used? *)
-        (* yes *)
-        (x, (next_loc_simple()))
-        (* no *)
-        (* continue *)
-        ::lo)
 
-         (* check if func args are used, if not, don't bother giving them a loc *)
+      (fun lo (x, _) -> 
       
+    (* lo) *)
+      (x, next_loc_simple())::lo)
+
       (fun lo l -> (l, Alloc.LLbl (Platform.mangle l))::lo)
       
       (fun lo (uid2, i) ->
         let live_set = live uid2 in
-        if insn_assigns i 
-        then
-         let ret = (uid2, next_loc live_set lo)::lo in 
-         (Printf.printf "insn_assigns i  = true"); ret
-        else (uid2, Alloc.LVoid)::lo) (* defines uid *)
+        if insn_assigns i then
+         (uid2, next_loc live_set lo)::lo
+        else (uid2, Alloc.LVoid)::lo)       
       
-      (fun uid3 _ -> uid3) (* defines uid *)
+      (fun lo (u,t) -> 
+(*       Printf.printf "\n\nsize of x = %d\n" (List.length x);
+      Printf.printf "l = %s\n\n" u; *)
+      
+      (* let new_layout1 = List.remove_assoc "arcv" x in
+      let new_layout2 = List.remove_assoc "argc" new_layout1 in *)
+      
+      (* List.iter (fun (uid, loc) -> Printf.printf "****** uid %s\n\n" uid) lo; *)
+
+      (* let live_set = live x in
+      Printf.printf "size of live_set %d\n" (LocSet.cardinal live_set); *)
+      lo) (* defines uid *)
+
       [] f in
-  { uid_loc = (fun x -> List.assoc x lo)
+  { 
+    uid_loc = (fun x -> 
+    
+    (* Printf.printf "trying to find loc for x=%s\n" x;  *)
+    List.assoc x lo  
+    (* try
+      List.assoc x lo  
+    with
+    | _ -> Alloc.LVoid *))
   ; spill_bytes = 8 * !n_spill
   }
 
