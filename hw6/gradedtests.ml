@@ -180,6 +180,29 @@ let executed_c_link tests =
       (fn ^ ":" ^ (String.concat " " args)), assert_eqf (fun () -> c_link_test c_file fn args) ans)
     tests
 
+
+let problematic_tests = [
+  
+  (* Exception: *)
+  
+"llprograms/add.ll", 14L
+  (* "llprograms/return42.ll", 42L *)
+  (* ; "llprograms/alloca1.ll", 17L
+  ; "llprograms/alloca2.ll", 17L
+  ; "llprograms/bitcast1.ll", 3L
+  ; "llprograms/gep1.ll", 6L
+  ; "llprograms/gep8.ll", 2L
+  ; "llprograms/sum_tree.ll", 116L
+  ; "llprograms/gcd_euclidian.ll", 2L
+  ; "llprograms/binarysearch.ll", 8L
+  
+  (* Not equal: *)
+  ; "llprograms/call8.ll", 21L
+  ; "llprograms/arith_combo.ll", 4L
+  ; "llprograms/return_intermediate.ll", 18L
+  ; "llprograms/binary_gcd.ll", 3L *)
+]
+
 let binop_tests =
   [ "llprograms/add.ll", 14L
   ; "llprograms/sub.ll", 1L
@@ -458,15 +481,19 @@ let tests : suite =
   ; GradedTest("ll regalloc quality tests", 15, quality_ll ll_tests)
   ; GradedTest("oat regalloc correctness tests", 15, executed_oat_file oat_tests) 
   ; GradedTest("oat regalloc quality tests", 15, quality_oat oat_tests)
+
+
+  (* GradedTest("ll problematic_tests correctness tests", 15, executed problematic_tests)   *)
+  (* ; GradedTest("ll problematic_tests quality_ll tests", 15, quality_ll problematic_tests)   *)
   ]
 
 let manual_tests : suite = [
-    GradedTest ("Posted Piazza Test Case", 5,
+    (* GradedTest ("Posted Piazza Test Case", 5,
               [("manually", assert_eq true false)]
     )
   ; GradedTest ("Performance Comparison", 5,
               [("manually", assert_eq true false)]
-    )
+    ) *)
   ]
 
 let graded_tests : suite =

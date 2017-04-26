@@ -560,35 +560,56 @@ let fold_fdecl (f_param : 'a -> uid * Ll.ty -> 'a)
                (init:'a) (f:Ll.fdecl) : 'a =
 *)
 
+
+let count_assigning_insns (l: (uid * insn) list) = 
+  List.fold_left (fun c (uid, insn) -> 
+    if insn_assigns insn then
+      c + 1
+    else 
+      c
+  ) 0 l
+
+let count_uids (f:Ll.fdecl) = 
+  let entry_blk, blks = f.cfg in
+  let count = count_assigning_insns entry_blk.insns in
+  List.fold_left (fun c (_, blk) -> 
+    c + (count_assigning_insns blk.insns)
+  ) count blks
+
 let live_layout (f:Ll.fdecl) (live:liveness) : layout =
   let pal = ref LocSet.(caller_save 
                         |> remove (Alloc.LReg Rax) 
                         |> remove (Alloc.LReg Rcx)) in
   let n_spill = ref 0 in
-  
+  let uid_count = ref (count_uids f) in
+
   let next_loc live_set lo =
     (* Printf.printf "Size of live_set %d\n" (UidSet.cardinal live_set); *)
     let used = UidSet.fold (fun _uid reg_set -> 
     try
       let _loc = List.assoc _uid lo in
-      (* Printf.printf "Found taken one\n"; *)
       LocSet.add _loc reg_set
     with
-      Not_found -> (* Printf.printf "Found free one\n"; *) reg_set
+      Not_found -> reg_set
     ) live_set LocSet.empty in
     let available = LocSet.diff !pal used in
-    (* Printf.printf "Size of available %d\n" (LocSet.cardinal available); *)
-    if LocSet.is_empty available
-    then let ret = (incr n_spill; Alloc.LStk (- !n_spill)) in Printf.printf "Spill!\n"; ret
-    else if LocSet.equal available !pal then
-    Alloc.LReg Rax
+    
+    if LocSet.is_empty available then 
+    let ret = (incr n_spill; decr uid_count; Alloc.LStk (- !n_spill)) in(*  Printf.printf "Spill from here!\n\n\n"; *) ret
+    
+    else if !uid_count = 1 then
+    let l = Alloc.LReg Rax in (* Printf.printf "msg2\n\n";  *)l
+    
+    (* (let l = Alloc.LReg Rax in
+    pal := LocSet.remove l !pal; Alloc.LReg Rax) *)
     else (let l = LocSet.choose available in
-          pal := LocSet.remove l !pal; l)
+          pal := LocSet.remove l !pal; decr uid_count; l)
   in
 
   let next_loc_simple () =
     if LocSet.is_empty !pal then 
-    (incr n_spill; Alloc.LStk (- !n_spill))
+    
+    (incr n_spill;(*  Printf.printf "Spill from simple!\n\n\n"; *) Alloc.LStk (- !n_spill))
     else 
     (let l = LocSet.choose !pal in
           pal := LocSet.remove l !pal; l)
@@ -624,6 +645,8 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
       lo) (* defines uid *)
 
       [] f in
+
+      (* Printf.printf "There are %d spills\n\n" !n_spill;       *)
   { 
     uid_loc = (fun x -> 
     
