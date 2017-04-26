@@ -676,7 +676,7 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
         | Ret (_ty, operand_option) ->
           begin match operand_option with
           | Some (Const c) ->
-            (if !cbr then
+            (if !cbr && !ret_imm then
               ret_imm := false
             else
               ret_imm := true;
@@ -686,6 +686,8 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
         | _ -> ()
 
         end in
+        
+        Printf.printf "U = %s\n\n" u;
 
 
         lo) (* defines uid *)

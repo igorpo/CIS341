@@ -184,7 +184,9 @@ let executed_c_link tests =
 let problematic_tests = [
   
   (* Exception: *)
-  "llprograms/cbr1.ll", 7L
+  (* ("atprograms/easyrun1.oat", "", "17"); *)
+("atprograms/our_test.oat", "", "5");
+  (* "llprograms/cbr1.ll", 7L *)
   (* "llprograms/return.ll", 0L *)
 (* "llprograms/add.ll", 14L *)
   (* "llprograms/return42.ll", 42L *)
@@ -476,16 +478,16 @@ let oat_tests =
 
 let tests : suite =
   [ 
-   GradedTest("solver / alias analysis tests", 20, executed_alias_file alias_analysis_tests)
+   (* GradedTest("solver / alias analysis tests", 20, executed_alias_file alias_analysis_tests)
   ; GradedTest("liveness analysis tests", 10, executed_liveness_file liveness_analysis_tests)
   ; GradedTest("ll regalloc correctness tests", 15, executed ll_tests)  
   ; GradedTest("ll regalloc quality tests", 15, quality_ll ll_tests)
   ; GradedTest("oat regalloc correctness tests", 15, executed_oat_file oat_tests) 
-  ; GradedTest("oat regalloc quality tests", 15, quality_oat oat_tests)
+  ; GradedTest("oat regalloc quality tests", 15, quality_oat oat_tests) *)
 
-
-   (*  GradedTest("ll problematic_tests correctness tests", 15, executed problematic_tests)  
-  ; GradedTest("ll problematic_tests quality_ll tests", 15, quality_ll problematic_tests)  *)
+   (* GradedTest("oat regalloc correctness tests", 15, executed_oat_file problematic_tests)  *)
+    GradedTest("ll problematic_tests correctness tests", 15, executed_oat_file problematic_tests)  
+  ; GradedTest("ll problematic_tests quality_ll tests", 15, quality_oat problematic_tests) 
   ]
 
 let manual_tests : suite = [

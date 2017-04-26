@@ -1,0 +1,54 @@
+int program(int argc, string[] argv) {
+  var a = 1;
+  var b = 2;
+  var c = 3; 
+  var d = b; 
+  var e = 1;
+  var f = 2;
+  var g = 3; 
+  var h = b; 
+  var l = 1;
+  var m = 2;
+  var x = 3; 
+  var y = b; 
+
+  for (var i = 0; i < 500; i = i + 1;) {
+        var a2 = 2;
+        var b2 = 2;
+        var c2 = 3; 
+        var d2 = b; 
+        var e2 = 2;
+        var f2 = 2;
+        var g2 = 3; 
+        var h2 = b; 
+        var l2 = 2;
+        var m2 = 2;
+        var x2 = 3; 
+        var y2 = b; 
+
+  	for (var j = 0; j < 500; j = j + 1;) {
+  		var k = 1;
+  		var n = 2;
+      while (c > 0) {
+        c = c - 1;
+
+        var a1 = 1;
+        var b1 = 2;
+        var c1 = 3; 
+        var d1 = b; 
+        var e1 = 1;
+        var f1 = 2;
+        var g1 = 3; 
+        var h1 = b; 
+        var l1 = 1;
+        var m1 = 2;
+        var x1 = 3; 
+        var y1 = b; 
+
+      }
+  	}
+  }
+
+
+  return 5;
+}
