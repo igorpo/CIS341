@@ -184,8 +184,9 @@ let executed_c_link tests =
 let problematic_tests = [
   
   (* Exception: *)
-  
-"llprograms/add.ll", 14L
+  "llprograms/cbr1.ll", 7L
+  (* "llprograms/return.ll", 0L *)
+(* "llprograms/add.ll", 14L *)
   (* "llprograms/return42.ll", 42L *)
   (* ; "llprograms/alloca1.ll", 17L
   ; "llprograms/alloca2.ll", 17L
@@ -483,8 +484,8 @@ let tests : suite =
   ; GradedTest("oat regalloc quality tests", 15, quality_oat oat_tests)
 
 
-  (* GradedTest("ll problematic_tests correctness tests", 15, executed problematic_tests)   *)
-  (* ; GradedTest("ll problematic_tests quality_ll tests", 15, quality_ll problematic_tests)   *)
+   (*  GradedTest("ll problematic_tests correctness tests", 15, executed problematic_tests)  
+  ; GradedTest("ll problematic_tests quality_ll tests", 15, quality_ll problematic_tests)  *)
   ]
 
 let manual_tests : suite = [

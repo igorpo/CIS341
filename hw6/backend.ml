@@ -119,6 +119,9 @@ let prog_of_x86stream : x86stream -> X86.prog =
 type layout = 
   { uid_loc : uid -> Alloc.loc
   ; spill_bytes : int
+  ; has_uids : bool
+  ; ret_imm : bool
+  ; imm : int
   }
 
 (* The liveness analysis will return the set of variables that are live at 
@@ -276,7 +279,7 @@ let compile_getelementptr tdecls (t:Ll.ty)
 
 (* compiling instructions within function bodies ---------------------------- *)
 
-let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
+let compile_fbody has_uids tdecls (af:Alloc.fbody) : x86stream =
   let rec loop (af:Alloc.fbody) (outstream:x86stream) : x86stream =
     let cb = function
       | Ll.Add ->  Addq | Ll.Sub ->  Subq | Ll.Mul ->  Imulq
@@ -390,19 +393,34 @@ let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
                else lift Asm.[ Movq, [~%Rax; co (Loc x)] ]) )
 
     | (Ret (_,None), _)::rest ->
-       loop rest @@ 
+      if has_uids then
+      loop rest @@ 
          ( outstream
            >@ lift Asm.[ Movq, [~%Rbp; ~%Rsp]
                        ; Popq, [~%Rbp]
                        ; Retq, [] ] )
+      else
+        loop rest @@ 
+         ( outstream
+           >@ lift Asm.[ Retq, [] ] )
+       
 
     | (Ret (_,Some o), _)::rest ->
-       loop rest @@ 
+      if has_uids then
+          loop rest @@ 
          ( outstream
            >@ emit_mov (co o) (Reg Rax)
            >@ lift Asm.[ Movq, [~%Rbp; ~%Rsp]
                        ; Popq, [~%Rbp]
                        ; Retq, [] ] )
+       else
+       loop rest @@ 
+         ( outstream
+           >@ emit_mov (co o) (Reg Rax)
+           >@ lift Asm.[Retq, [] ] )
+
+
+       
 
     | (Br (LLbl l), _)::rest ->
        loop rest @@ 
@@ -482,6 +500,9 @@ let no_reg_layout (f:Ll.fdecl) (_:liveness) : layout =
       ([], 0) f in
   { uid_loc = (fun x -> List.assoc x lo)
   ; spill_bytes = 8 * n_stk
+  ; has_uids = true
+  ; ret_imm = false
+  ; imm = 0
   }
 
 (* simple layout ------------------------------------------------------------ *)
@@ -511,6 +532,9 @@ let simple_layout (f:Ll.fdecl) (_:liveness) : layout =
       [] f in
   { uid_loc = (fun x -> List.assoc x lo)
   ; spill_bytes = 8 * !n_spill
+  ; has_uids = true
+  ; ret_imm = false
+  ; imm = 0
   }
 
 (* live layout -------------------------------------------------------------- *)
@@ -561,6 +585,8 @@ let fold_fdecl (f_param : 'a -> uid * Ll.ty -> 'a)
 *)
 
 
+
+(* Takes block.insns *)
 let count_assigning_insns (l: (uid * insn) list) = 
   List.fold_left (fun c (uid, insn) -> 
     if insn_assigns insn then
@@ -568,6 +594,9 @@ let count_assigning_insns (l: (uid * insn) list) =
     else 
       c
   ) 0 l
+
+
+
 
 let count_uids (f:Ll.fdecl) = 
   let entry_blk, blks = f.cfg in
@@ -581,8 +610,18 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
                         |> remove (Alloc.LReg Rax) 
                         |> remove (Alloc.LReg Rcx)) in
   let n_spill = ref 0 in
+  let ret_imm = ref false in
+  let imm = ref 0 in
+  let cbr = ref false in
   let uid_count = ref (count_uids f) in
-
+  Printf.printf "UID COUNT: %d\n\n" !uid_count;
+  let has_uids_ = 
+  if !uid_count = 0 then 
+    false 
+  else 
+    true
+  in
+  Printf.printf "HAS_UIDS_ = %b" has_uids_;
   let next_loc live_set lo =
     (* Printf.printf "Size of live_set %d\n" (UidSet.cardinal live_set); *)
     let used = UidSet.fold (fun _uid reg_set -> 
@@ -595,10 +634,10 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
     let available = LocSet.diff !pal used in
     
     if LocSet.is_empty available then 
-    let ret = (incr n_spill; decr uid_count; Alloc.LStk (- !n_spill)) in(*  Printf.printf "Spill from here!\n\n\n"; *) ret
+    (incr n_spill; decr uid_count; Alloc.LStk (- !n_spill))
     
     else if !uid_count = 1 then
-    let l = Alloc.LReg Rax in (* Printf.printf "msg2\n\n";  *)l
+    let l = Alloc.LReg Rax in l
     
     (* (let l = Alloc.LReg Rax in
     pal := LocSet.remove l !pal; Alloc.LReg Rax) *)
@@ -609,7 +648,7 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
   let next_loc_simple () =
     if LocSet.is_empty !pal then 
     
-    (incr n_spill;(*  Printf.printf "Spill from simple!\n\n\n"; *) Alloc.LStk (- !n_spill))
+    (incr n_spill; Alloc.LStk (- !n_spill))
     else 
     (let l = LocSet.choose !pal in
           pal := LocSet.remove l !pal; l)
@@ -619,8 +658,6 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
     fold_fdecl
 
       (fun lo (x, _) -> 
-      
-    (* lo) *)
       (x, next_loc_simple())::lo)
 
       (fun lo l -> (l, Alloc.LLbl (Platform.mangle l))::lo)
@@ -632,32 +669,37 @@ let live_layout (f:Ll.fdecl) (live:liveness) : layout =
         else (uid2, Alloc.LVoid)::lo)       
       
       (fun lo (u,t) -> 
-(*       Printf.printf "\n\nsize of x = %d\n" (List.length x);
-      Printf.printf "l = %s\n\n" u; *)
-      
-      (* let new_layout1 = List.remove_assoc "arcv" x in
-      let new_layout2 = List.remove_assoc "argc" new_layout1 in *)
-      
-      (* List.iter (fun (uid, loc) -> Printf.printf "****** uid %s\n\n" uid) lo; *)
 
-      (* let live_set = live x in
-      Printf.printf "size of live_set %d\n" (LocSet.cardinal live_set); *)
-      lo) (* defines uid *)
+        let _ = 
+        begin match t with 
+        | Cbr _ -> cbr := true
+        | Ret (_ty, operand_option) ->
+          begin match operand_option with
+          | Some (Const c) ->
+            (if !cbr then
+              ret_imm := false
+            else
+              ret_imm := true;
+              imm := Int64.to_int c)
+          | _ -> ()
+          end
+        | _ -> ()
+
+        end in
+
+
+        lo) (* defines uid *)
 
       [] f in
-
-      (* Printf.printf "There are %d spills\n\n" !n_spill;       *)
   { 
     uid_loc = (fun x -> 
-    
-    (* Printf.printf "trying to find loc for x=%s\n" x;  *)
-    List.assoc x lo  
-    (* try
-      List.assoc x lo  
-    with
-    | _ -> Alloc.LVoid *))
+    List.assoc x lo)
   ; spill_bytes = 8 * !n_spill
+  ; has_uids = has_uids_
+  ; ret_imm = !ret_imm
+  ; imm = !imm
   }
+
 
 
 
@@ -703,13 +745,23 @@ let set_regalloc name =
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
   let liveness = !liveness_fn f in
   let layout = !layout_fn f liveness in
+
+  if layout.ret_imm then
+    let imm = layout.imm in
+    [L (Platform.mangle g, true)] >@ lift 
+    Asm.[ Movq,  [~$(imm); ~%Rax] 
+        ; Retq, []]
+  else
+
   let afdecl = alloc_fdecl layout liveness f in
+  let preamble = if layout.has_uids then lift 
+    Asm.[ Pushq, [~%Rbp]
+        ; Movq,  [~%Rsp; ~%Rbp] ] else [] in
   [L (Platform.mangle g, true)]
-  >@ lift Asm.[ Pushq, [~%Rbp]
-              ; Movq,  [~%Rsp; ~%Rbp] ]
+  >@ preamble 
   >@ (if layout.spill_bytes <= 0 then [] else
       lift Asm.[ Subq,  [~$(layout.spill_bytes); ~%Rsp] ])
-  >@ compile_fbody tdecls afdecl
+  >@ compile_fbody ((count_uids f) <> 0) tdecls afdecl
 
 (* compile_gdecl ------------------------------------------------------------ *)
 
